@@ -11,11 +11,14 @@ import {
   StatusBar,
   Alert,
   Animated,
-  Image
+  Image,
+  ActivityIndicator
 } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
 import Icon from 'react-native-vector-icons/FontAwesome';
 import { Colors } from '../styles/theme';
+import { authAPI } from '../services/apiService'; // Import the API
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const LoginScreen = ({ navigation }) => {
   const [login, setLogin] = useState('');
@@ -31,6 +34,7 @@ const LoginScreen = ({ navigation }) => {
     color: '#ff4757'
   });
   const [passwordMatch, setPasswordMatch] = useState(true);
+  const [isLoading, setIsLoading] = useState(false); // Add loading state
 
   const shakeAnimation = useRef(new Animated.Value(0)).current;
 
@@ -120,33 +124,66 @@ const LoginScreen = ({ navigation }) => {
     ]).start();
   };
 
-  const handleLogin = () => {
-    if (!login || !password || !confirmPassword) {
-      Alert.alert('Error', 'Please fill in all fields');
-      shake();
-      return;
-    }
+  // Updated handleLogin with API integration
+ const handleLogin = async () => {
+  if (!login || !password) {
+    Alert.alert('Error', 'Please enter both login and password');
+    shake();
+    return;
+  }
 
-    if (!passwordMatch) {
-      Alert.alert('Error', 'Passwords do not match');
-      shake();
-      return;
-    }
+  if (userCaptcha.toLowerCase() !== captchaText.toLowerCase()) {
+    Alert.alert('Error', 'Please enter the correct CAPTCHA');
+    shake();
+    generateCaptcha();
+    return;
+  }
 
-    if (userCaptcha.toLowerCase() !== captchaText.toLowerCase()) {
-      Alert.alert('Error', 'Please enter the correct CAPTCHA');
-      shake();
+  setIsLoading(true);
+
+  try {
+    // Call API
+    const response = await authAPI.login(login, password);
+
+    // Check response
+    if (response.data.success) {
+      // Save token & user info
+      await AsyncStorage.setItem('userToken', response.data.token);
+      await AsyncStorage.setItem('userData', JSON.stringify(response.data.user));
+
+      // Navigate based on role
+      switch (response.data.user.role) {
+        case 1:
+          navigation.navigate('AdminDashboard');
+          break;
+        case 2:
+          navigation.navigate('UserDashboard');
+          break;
+        case 3:
+          navigation.navigate('ResolverDashboard');
+          break;
+        case 4:
+          navigation.navigate('AssignerDashboard');
+          break;
+        default:
+          navigation.navigate('Home');
+      }
+    } else {
+      Alert.alert('Login Failed', response.data.message || 'Invalid credentials');
       generateCaptcha();
-      return;
     }
+  } catch (error) {
+    console.log('Login error:', error.response?.data || error.message);
+    Alert.alert(
+      'Login Failed',
+      error.response?.data?.message || 'Invalid credentials. Please try again.'
+    );
+    generateCaptcha();
+  } finally {
+    setIsLoading(false);
+  }
+};
 
-    if (passwordStrength.level < 3) {
-      Alert.alert('Weak Password', 'Please use a stronger password for security');
-      return;
-    }
-
-    navigation.navigate('Dashboard', { userName: login });
-  };
 
   // Initialize CAPTCHA on component mount
   React.useEffect(() => {
@@ -245,35 +282,33 @@ const LoginScreen = ({ navigation }) => {
           keyboardShouldPersistTaps="handled"
         >
           {/* Sign In Container */}
-          {/* Sign In Container */}
-<View style={styles.signInContainer}>
-  <Animated.View style={[styles.cardContainer, { transform: [{ translateX: shakeAnimation }] }]}>
-    <LinearGradient
-      colors={['#ffffff', '#f8f9fa', '#ffffff']}
-      style={styles.cardGradient}
-    >
-      
-      {/* Logo */}
-      <View style={styles.logoContainerCard}>
-        <LinearGradient
-          colors={[Colors.primary, Colors.secondary]}
-          style={styles.logoCircleCard}
-        >
-          <Image 
-            source={require('../assets/images/crp.png')}
-            style={styles.loginCardLogo}
-            resizeMode="contain"
-          />
-        </LinearGradient>
-      </View>
+          <View style={styles.signInContainer}>
+            <Animated.View style={[styles.cardContainer, { transform: [{ translateX: shakeAnimation }] }]}>
+              <LinearGradient
+                colors={['#ffffff', '#f8f9fa', '#ffffff']}
+                style={styles.cardGradient}
+              >
+                
+                {/* Logo */}
+                <View style={styles.logoContainerCard}>
+                  <LinearGradient
+                    colors={[Colors.primary, Colors.secondary]}
+                    style={styles.logoCircleCard}
+                  >
+                    <Image 
+                      source={require('../assets/images/crp.png')}
+                      style={styles.loginCardLogo}
+                      resizeMode="contain"
+                    />
+                  </LinearGradient>
+                </View>
 
-      {/* Title */}
-      <View style={styles.header}>
-        <Text style={styles.title}>Sign In to CRP</Text>
-        <Text style={styles.subtitle}>Access Your Change Request Portal</Text>
-      </View>
+                {/* Title */}
+                <View style={styles.header}>
+                  <Text style={styles.title}>Sign In to CRP</Text>
+                  <Text style={styles.subtitle}>Access Your Change Request Portal</Text>
+                </View>
 
-      {/* Rest of your existing code remains the same... */}
                 {/* Email / CNIC */}
                 <View style={styles.inputWrapper}>
                   <Icon name="user" size={20} color={Colors.secondary} style={styles.inputIcon} />
@@ -287,15 +322,15 @@ const LoginScreen = ({ navigation }) => {
                   />
                 </View>
 
-                {/* Password with strength indicator */}
+                {/* Password */}
                 <View style={styles.inputWrapper}>
                   <Icon name="lock" size={20} color={Colors.secondary} style={styles.inputIcon} />
                   <TextInput
                     style={styles.input}
-                    placeholder="Strong Password"
+                    placeholder="Password"
                     placeholderTextColor="#666"
                     value={password}
-                    onChangeText={checkPasswordStrength}
+                    onChangeText={setPassword}
                     secureTextEntry={!showPassword}
                   />
                   <TouchableOpacity onPress={() => setShowPassword(!showPassword)}>
@@ -306,51 +341,6 @@ const LoginScreen = ({ navigation }) => {
                     />
                   </TouchableOpacity>
                 </View>
-
-                {/* Password Strength Indicator */}
-                {password.length > 0 && (
-                  <View style={styles.strengthContainer}>
-                    <View style={styles.strengthBar}>
-                      <View 
-                        style={[
-                          styles.strengthFill, 
-                          { 
-                            width: `${(passwordStrength.level / 5) * 100}%`,
-                            backgroundColor: passwordStrength.color
-                          }
-                        ]} 
-                      />
-                    </View>
-                    <Text style={[styles.strengthText, { color: passwordStrength.color }]}>
-                      Strength: {passwordStrength.message}
-                      {passwordStrength.level >= 3 && ' ✓'}
-                    </Text>
-                  </View>
-                )}
-
-                {/* Confirm Password */}
-                <View style={[styles.inputWrapper, !passwordMatch && styles.inputError]}>
-                  <Icon name="lock" size={20} color={!passwordMatch ? '#ff4757' : Colors.secondary} style={styles.inputIcon} />
-                  <TextInput
-                    style={styles.input}
-                    placeholder="Confirm Strong Password"
-                    placeholderTextColor="#666"
-                    value={confirmPassword}
-                    onChangeText={handleConfirmPasswordChange}
-                    secureTextEntry={!showConfirmPassword}
-                  />
-                  <TouchableOpacity onPress={() => setShowConfirmPassword(!showConfirmPassword)}>
-                    <Icon
-                      name={showConfirmPassword ? 'eye-slash' : 'eye'}
-                      size={20}
-                      color={!passwordMatch ? '#ff4757' : '#666'}
-                    />
-                  </TouchableOpacity>
-                </View>
-
-                {!passwordMatch && confirmPassword.length > 0 && (
-                  <Text style={styles.errorText}>Passwords do not match</Text>
-                )}
 
                 {/* CAPTCHA Section with Wiggly Text */}
                 <View style={styles.captchaContainer}>
@@ -390,12 +380,20 @@ const LoginScreen = ({ navigation }) => {
                 </TouchableOpacity>
 
                 {/* Login Button */}
-                <TouchableOpacity style={styles.loginButton} onPress={handleLogin}>
+                <TouchableOpacity 
+                  style={[styles.loginButton, isLoading && styles.loginButtonDisabled]} 
+                  onPress={handleLogin}
+                  disabled={isLoading}
+                >
                   <LinearGradient
                     colors={[Colors.primary, Colors.secondary]}
                     style={styles.loginButtonGradient}
                   >
-                    <Text style={styles.loginButtonText}>Sign In</Text>
+                    {isLoading ? (
+                      <ActivityIndicator color={Colors.accent} size="small" />
+                    ) : (
+                      <Text style={styles.loginButtonText}>Sign In</Text>
+                    )}
                   </LinearGradient>
                 </TouchableOpacity>
 
@@ -692,6 +690,9 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.3,
     shadowRadius: 10,
     elevation: 5,
+  },
+  loginButtonDisabled: {
+    opacity: 0.7,
   },
   loginButtonGradient: { 
     flex: 1, 
