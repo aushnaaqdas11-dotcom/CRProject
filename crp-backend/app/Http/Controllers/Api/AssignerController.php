@@ -3,41 +3,71 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
-use App\Models\UserRequest;
+use App\Models\ChangeRequest;
 use App\Models\Project;
-use App\Models\Developer;
+use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Validator;
 
 class AssignerController extends Controller
 {
-    public function dashboard()
+    public function dashboard(Request $request)
     {
         try {
-            $currentAssignerId = Auth::id();
+            $user = Auth::user();
             
-            $projectIds = Project::where('assigner_id', $currentAssignerId)->pluck('id');
-
-            $requests = collect();
-            if ($projectIds->isNotEmpty()) {
-                $requests = UserRequest::with(['user', 'project'])
-                    ->whereIn('project_id', $projectIds)
-                    ->orderByDesc('id')
-                    ->get();
+            // Get status filter
+            $statusFilter = $request->query('status', 'all');
+            $search = $request->query('search', '');
+            
+            // Build query for requests
+            $query = ChangeRequest::with(['user', 'project', 'service', 'assignedTo'])
+                ->orderBy('created_at', 'desc');
+                
+            // Apply status filter
+            if ($statusFilter !== 'all') {
+                $query->where('status', $statusFilter);
             }
-
-            $stats = [
-                'total' => $requests->count(),
-                'pending' => $requests->where('status', 'pending')->count(),
-                'in_progress' => $requests->where('status', 'inprogress')->count(),
-                'completed' => $requests->where('status', 'completed')->count(),
-            ];
+            
+            // Apply search filter
+            if (!empty($search)) {
+                $query->where(function($q) use ($search) {
+                    $q->where('request_details', 'like', "%{$search}%")
+                      ->orWhereHas('user', function($q) use ($search) {
+                          $q->where('name', 'like', "%{$search}%");
+                      })
+                      ->orWhereHas('service', function($q) use ($search) {
+                          $q->where('name', 'like', "%{$search}%");
+                      });
+                });
+            }
+            
+            $requests = $query->paginate(10);
+            
+            // Get statistics
+            $totalRequests = ChangeRequest::count();
+            $pendingRequests = ChangeRequest::where('status', 'pending')->count();
+            $inProgressRequests = ChangeRequest::where('status', 'inprogress')->count();
+            $completedRequests = ChangeRequest::where('status', 'completed')->count();
 
             return response()->json([
                 'success' => true,
-                'data' => [
-                    'requests' => $requests,
-                    'stats' => $stats
+                'user' => [
+                    'id' => $user->id,
+                    'name' => $user->name,
+                    'email' => $user->email
+                ],
+                'statistics' => [
+                    'total' => $totalRequests,
+                    'pending' => $pendingRequests,
+                    'in_progress' => $inProgressRequests,
+                    'completed' => $completedRequests
+                ],
+                'requests' => $requests,
+                'filters' => [
+                    'status' => $statusFilter,
+                    'search' => $search
                 ]
             ]);
 
@@ -53,15 +83,13 @@ class AssignerController extends Controller
     public function show($id)
     {
         try {
-            $request = UserRequest::with(['user', 'project'])->findOrFail($id);
-            $developers = Developer::all();
+            $request = ChangeRequest::with(['user', 'project', 'service'])->findOrFail($id);
+            $developers = User::where('role', 3)->where('status', 'active')->get(['id', 'name', 'email']);
             
             return response()->json([
                 'success' => true,
-                'data' => [
-                    'request' => $request,
-                    'developers' => $developers
-                ]
+                'change_request' => $request,
+                'developers' => $developers
             ]);
 
         } catch (\Exception $e) {
@@ -76,11 +104,13 @@ class AssignerController extends Controller
     public function getDevelopers()
     {
         try {
-            $developers = Developer::all();
-            
+            $developers = User::where('role', 3)
+                ->where('status', 'active')
+                ->get(['id', 'name', 'email']);
+
             return response()->json([
                 'success' => true,
-                'data' => $developers
+                'developers' => $developers
             ]);
 
         } catch (\Exception $e) {
@@ -92,25 +122,34 @@ class AssignerController extends Controller
         }
     }
 
-    public function assign(Request $request, $id)
+    public function assignDeveloper(Request $request, $id)
     {
         try {
-            $validatedData = $request->validate([
-                'developer_id' => 'required|exists:developers,id',
-                'assigner_comments' => 'nullable|string|max:1000',
+            $validator = Validator::make($request->all(), [
+                'developer_id' => 'required|exists:users,id',
+                'assignment_notes' => 'nullable|string'
             ]);
 
-            $userRequest = UserRequest::findOrFail($id);
-            $userRequest->update([
-                'assigned_to' => $validatedData['developer_id'],
-                'assigner_comment' => $validatedData['assigner_comments'],
-                'status' => 'inprogress'
+            if ($validator->fails()) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Validation error',
+                    'errors' => $validator->errors()
+                ], 422);
+            }
+
+            $changeRequest = ChangeRequest::findOrFail($id);
+            
+            $changeRequest->update([
+                'assigned_to' => $request->developer_id,
+                'assignment_notes' => $request->assignment_notes,
+                'status' => 'assigned'
             ]);
 
             return response()->json([
                 'success' => true,
-                'message' => 'Developer assigned successfully!',
-                'data' => $userRequest
+                'message' => 'Developer assigned successfully',
+                'change_request' => $changeRequest->load(['service', 'project', 'user', 'assignedTo'])
             ]);
 
         } catch (\Exception $e) {

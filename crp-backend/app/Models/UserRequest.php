@@ -13,6 +13,7 @@ class UserRequest extends Model
 
     protected $fillable = [
         'user_id',
+        'query_id',
         'project_id',
         'priority',
         'request_details',
@@ -20,12 +21,17 @@ class UserRequest extends Model
         'assigned_to',
         'assigner_comment',
         'resolver_comment',
-        'hours_worked'
+        'hours_worked',
     ];
 
     public function user()
     {
         return $this->belongsTo(User::class, 'user_id');
+    }
+
+    public function relatedQuery() // Renamed from query() to avoid conflict
+    {
+        return $this->belongsTo(Query::class, 'query_id');
     }
 
     public function project()

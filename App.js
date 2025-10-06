@@ -1,5 +1,6 @@
 import React from 'react';
 import { StatusBar } from 'react-native';
+import { AuthProvider } from './src/context/AuthContext'; // Adjust path based on your structure
 import AppNavigator from './src/navigation/AppNavigator';
 
 const App = () => {
@@ -10,7 +11,9 @@ const App = () => {
         backgroundColor="#FFFFFF" 
         translucent 
       />
-      <AppNavigator />
+     <AuthProvider>
+        <AppNavigator />
+      </AuthProvider>
     </>
   );
 };
