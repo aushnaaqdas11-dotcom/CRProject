@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, ScrollView, StyleSheet, TouchableOpacity, Dimensions, TextInput } from 'react-native';
 import { Picker } from '@react-native-picker/picker';
-import apiService from '../services/apiService';
+import api from '../services/apiService';
 import { useAuth } from '../context/AuthContext';
 import { useNavigation } from '@react-navigation/native';
 
@@ -49,10 +49,10 @@ const UserDashboard = () => {
     try {
       const headers = { Authorization: `Bearer ${token}` };
       const [servicesRes, webRes, appRes, recentRes] = await Promise.all([
-        apiService.get('/services', { headers }),
-        apiService.get('/projects/web', { headers }),
-        apiService.get('/projects/app', { headers }),
-        apiService.get('/user/requests/recent', { headers }),
+        api.get('/services', { headers }),
+        api.get('/projects/web', { headers }),
+        api.get('/projects/app', { headers }),
+        api.get('/user/requests/recent', { headers }),
       ]);
       if (servicesRes.data.success) setServices(servicesRes.data.services || []);
       if (webRes.data.success) setWebProjects(webRes.data.projects || []);
@@ -84,7 +84,7 @@ const UserDashboard = () => {
         priority,
         request_details: requestDetails,
       };
-      const response = await apiService.post('/change-request', data, { headers });
+      const response = await api.post('/change-request', data, { headers });
       if (response.data.success) {
         setNotification({ message: 'Request submitted', type: 'success' });
         setTimeout(() => setNotification({ message: '', type: '' }), 5000);
@@ -101,7 +101,7 @@ const UserDashboard = () => {
   const handleLogout = async () => {
     try {
       const headers = { Authorization: `Bearer ${token}` };
-      await apiService.post('/logout', {}, { headers });
+      await api.post('/logout', {}, { headers });
       logout();
       navigation.navigate('Login');
     } catch (error) {

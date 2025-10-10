@@ -6,7 +6,7 @@ import {
   StyleSheet,
   TouchableOpacity,
 } from 'react-native';
-import apiService from '../services/apiService';
+import api from '../services/apiService';
 import { useAuth } from '../context/AuthContext';
 
 const UserHistoryScreen = () => {
@@ -21,7 +21,7 @@ const UserHistoryScreen = () => {
   const fetchData = async () => {
     try {
       const headers = { Authorization: `Bearer ${token}` };
-      const response = await apiService.get('/user/history', { headers });
+      const response = await api.get('/user/history', { headers });
       if (response.data.success) {
         setRequests(response.data.requests || []);
         setError(null);
