@@ -42,8 +42,12 @@ const UserDashboard = () => {
   const [notification, setNotification] = useState({ message: '', type: '' });
 
   useEffect(() => {
+    if (!token) {
+      navigation.reset({ index: 0, routes: [{ name: 'Login' }] });
+      return;
+    }
     fetchData();
-  }, []);
+  }, [token]);
 
   const fetchData = async () => {
     try {
@@ -54,25 +58,30 @@ const UserDashboard = () => {
         api.get('/projects/app', { headers }),
         api.get('/user/requests/recent', { headers }),
       ]);
+
       if (servicesRes.data.success) setServices(servicesRes.data.services || []);
       if (webRes.data.success) setWebProjects(webRes.data.projects || []);
       if (appRes.data.success) setAppProjects(appRes.data.projects || []);
       if (recentRes.data.success) setRecentRequests(recentRes.data.requests || []);
-      console.log('Services:', servicesRes.data.services);
-      console.log('Web Projects:', webRes.data.projects);
-      console.log('App Projects:', appRes.data.projects);
-      console.log('Recent Requests:', recentRes.data.requests);
     } catch (error) {
       console.error('Fetch error:', error.response ? error.response.data : error.message);
-      setNotification({ message: 'Failed to load data', type: 'error' });
-      setTimeout(() => setNotification({ message: '', type: '' }), 5000);
+      if (error.response && error.response.status === 401) {
+        logout();
+        navigation.reset({ index: 0, routes: [{ name: 'Login' }] });
+      } else {
+        showNotification('Failed to load data', 'error');
+      }
     }
+  };
+
+  const showNotification = (message, type = 'success') => {
+    setNotification({ message, type });
+    setTimeout(() => setNotification({ message: '', type: '' }), 5000);
   };
 
   const handleSubmit = async () => {
     if (!selectedService || !selectedProject || !requestDetails) {
-      setNotification({ message: 'Please fill all fields', type: 'error' });
-      setTimeout(() => setNotification({ message: '', type: '' }), 5000);
+      showNotification('Please fill all fields', 'error');
       return;
     }
 
@@ -85,16 +94,17 @@ const UserDashboard = () => {
         request_details: requestDetails,
       };
       const response = await api.post('/change-request', data, { headers });
+
       if (response.data.success) {
-        setNotification({ message: 'Request submitted', type: 'success' });
-        setTimeout(() => setNotification({ message: '', type: '' }), 5000);
+        showNotification('Request submitted', 'success');
         setRequestDetails('');
+        setSelectedService('');
+        setSelectedProject('');
         fetchData();
       }
     } catch (error) {
       console.error('Submit error:', error.response ? error.response.data : error.message);
-      setNotification({ message: 'Failed to submit', type: 'error' });
-      setTimeout(() => setNotification({ message: '', type: '' }), 5000);
+      showNotification('Failed to submit', 'error');
     }
   };
 
@@ -103,11 +113,10 @@ const UserDashboard = () => {
       const headers = { Authorization: `Bearer ${token}` };
       await api.post('/logout', {}, { headers });
       logout();
-      navigation.navigate('Login');
+      navigation.reset({ index: 0, routes: [{ name: 'Login' }] });
     } catch (error) {
       console.error('Logout error:', error.response ? error.response.data : error.message);
-      setNotification({ message: 'Logout failed', type: 'error' });
-      setTimeout(() => setNotification({ message: '', type: '' }), 5000);
+      showNotification('Logout failed', 'error');
     }
   };
 
@@ -119,6 +128,7 @@ const UserDashboard = () => {
             <Text>{notification.message}</Text>
           </View>
         )}
+
         <View style={styles.header}>
           <Text style={styles.logo}>
             SU<Text style={styles.logoSpan}>per</Text>
@@ -152,6 +162,7 @@ const UserDashboard = () => {
               <Text style={styles.label}>Web Projects Count: {webProjects.length}</Text>
               <Text style={styles.label}>App Projects Count: {appProjects.length}</Text>
             </View>
+
             <View style={styles.formGroup}>
               <Text style={styles.label}>Service Needed</Text>
               <Picker
@@ -254,7 +265,7 @@ const UserDashboard = () => {
                   ]}
                 >
                   <View style={styles.requestHeader}>
-                    <Text style={styles.serviceName}>{req.related_query?.name || 'No Service'}</Text> {/* Updated to related_query */}
+                    <Text style={styles.serviceName}>{req.related_query?.name || 'No Service'}</Text>
                     <Text
                       style={[
                         styles.priorityBadge,
@@ -267,7 +278,7 @@ const UserDashboard = () => {
                     </Text>
                   </View>
                   <Text style={styles.projectName}>
-                    Source: {req.project?.type === 'app' ? 'app' : 'web'} - {req.project?.name || 'N/A'}
+                    Source: {req.project?.type === 'app' ? 'App' : 'Web'} - {req.project?.name || 'N/A'}
                   </Text>
                   <Text style={styles.requestDate}>
                     Submitted on: {new Date(req.created_at).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}
@@ -294,6 +305,7 @@ const UserDashboard = () => {
 };
 
 const styles = StyleSheet.create({
+  // Keep all your original styles as-is
   container: { flex: 1, backgroundColor: '#e6fffa' },
   header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 15, flexWrap: 'wrap', gap: 10 },
   logo: { fontSize: 22, fontWeight: '700', color: '#2c3e50' },

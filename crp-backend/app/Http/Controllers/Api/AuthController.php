@@ -5,12 +5,15 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Validator;
+use App\Models\User;
 
 class AuthController extends Controller
 {
     public function login(Request $request)
     {
+        // 1️⃣ Validate input
         $validator = Validator::make($request->all(), [
             'login'    => 'required|string',
             'password' => 'required|string',
@@ -24,52 +27,46 @@ class AuthController extends Controller
             ], 422);
         }
 
-        $input = $request->all();
-        $fieldType = filter_var($input['login'], FILTER_VALIDATE_EMAIL) ? 'email' : 'cnic';
+        $login    = $request->input('login');
+        $password = $request->input('password');
 
-        if (Auth::attempt([$fieldType => $input['login'], 'password' => $input['password']])) {
-            $user = Auth::user();
+        // 2️⃣ Determine if login is email or CNIC
+        $fieldType = filter_var($login, FILTER_VALIDATE_EMAIL) ? 'email' : 'cnic';
 
-            // Generate Sanctum token
-            $token = $user->createToken('CRPApp')->plainTextToken;
+        // 3️⃣ Attempt to find the user
+        $user = User::where($fieldType, $login)->first();
 
-            // Dashboard selection with switch
-            switch ($user->role) {
-                case 1:
-                    $dashboard = 'admin';
-                    break;
-                case 2:
-                    $dashboard = 'user';
-                    break;
-                case 3:
-                    $dashboard = 'resolver';
-                    break;
-                case 4:
-                    $dashboard = 'assigner';
-                    break;
-                default:
-                    $dashboard = 'home';
-            }
-
+        if (!$user || !Hash::check($password, $user->password)) {
             return response()->json([
-                'success'     => true,
-                'token'       => $token,
-                'user'        => [
-                    'id'    => $user->id,
-                    'name'  => $user->name,
-                    'email' => $user->email,
-                    'cnic'  => $user->cnic,
-                    'phone' => $user->phone,
-                    'role'  => $user->role,
-                ],
-                'redirect_to' => $dashboard
-            ], 200);
+                'success' => false,
+                'message' => 'Invalid credentials',
+            ], 401);
         }
 
+        // 4️⃣ Create Sanctum token
+        $token = $user->createToken('CRPApp')->plainTextToken;
+
+        // 5️⃣ Map roles to dashboard
+        $dashboardMap = [
+            1 => 'admin',
+            2 => 'user',
+            3 => 'resolver',
+            4 => 'assigner',
+        ];
+
         return response()->json([
-            'success' => false,
-            'message' => 'Invalid credentials'
-        ], 401);
+            'success'     => true,
+            'token'       => $token,
+            'user'        => [
+                'id'    => $user->id,
+                'name'  => $user->name,
+                'email' => $user->email,
+                'cnic'  => $user->cnic,
+                'phone' => $user->phone,
+                'role'  => $user->role,
+            ],
+            'redirect_to' => $dashboardMap[$user->role] ?? 'home',
+        ], 200);
     }
 
     public function logout(Request $request)

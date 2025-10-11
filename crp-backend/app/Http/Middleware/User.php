@@ -1,20 +1,23 @@
 <?php
 
-namespace App\Models;
+namespace App\Http\Middleware;
 
-use Laravel\Sanctum\HasApiTokens;
-use Illuminate\Foundation\Auth\User as Authenticatable;
-use Illuminate\Notifications\Notifiable;
+use Closure;
+use Illuminate\Http\Request;
 
-class User extends Authenticatable
+class User
 {
-    use HasApiTokens, Notifiable;
+    public function handle(Request $request, Closure $next)
+    {
+        $user = $request->user(); // uses Sanctum to get authenticated user
 
-    protected $fillable = [
-        'name', 'cnic', 'email', 'phone', 'role', 'password',
-    ];
+        if ($user && $user->role == 2) {
+            return $next($request);
+        }
 
-    protected $hidden = [
-        'password', 'remember_token',
-    ];
+        return response()->json([
+            'success' => false,
+            'message' => 'Unauthorized. User access required.'
+        ], 401);
+    }
 }

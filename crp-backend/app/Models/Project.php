@@ -7,12 +7,23 @@ use Illuminate\Database\Eloquent\Model;
 
 class Project extends Model
 {
-    use HasFactory;
-
-    protected $fillable = ['name', 'type', 'assigner_id', 'user_id']; // add user_id for filtering projects to user
+    protected $fillable = ['name', 'type','assigner_id'];
 
     public function requests()
     {
         return $this->hasMany(UserRequest::class);
     }
+
+    // Scope for Web
+    public function scopeWeb($query)
+    {
+        return $query->where('type', 'web');
+    }
+
+    // Scope for App
+    public function scopeApp($query)
+    {
+        return $query->where('type', 'app');
+    }
 }
+

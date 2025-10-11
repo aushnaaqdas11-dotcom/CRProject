@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import {
   View,
   Text,
@@ -17,104 +17,31 @@ import {
 import LinearGradient from 'react-native-linear-gradient';
 import Icon from 'react-native-vector-icons/FontAwesome';
 import { Colors } from '../styles/theme';
-import { authAPI } from '../services/apiService'; // Import the API
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useAuth } from '../context/AuthContext';
 
 const LoginScreen = ({ navigation }) => {
   const [login, setLogin] = useState('');
   const [password, setPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
-  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [captchaText, setCaptchaText] = useState('');
   const [userCaptcha, setUserCaptcha] = useState('');
-  const [passwordStrength, setPasswordStrength] = useState({
-    level: 0,
-    message: '',
-    color: '#ff4757'
-  });
-  const [passwordMatch, setPasswordMatch] = useState(true);
-  const [isLoading, setIsLoading] = useState(false); // Add loading state
+  const [isLoading, setIsLoading] = useState(false);
 
   const shakeAnimation = useRef(new Animated.Value(0)).current;
+  const { login: authLogin } = useAuth();
 
-  // Generate random CAPTCHA
   const generateCaptcha = () => {
     const characters = 'ABCDEFGHJKLMNPQRSTUVWXYZ0123456789';
     let result = '';
     const length = Math.random() > 0.5 ? 6 : 7;
     for (let i = 0; i < length; i++) {
-      if (i === 4 && length === 7) {
-        result += '-';
-      } else {
-        result += characters.charAt(Math.floor(Math.random() * characters.length));
-      }
+      if (i === 4 && length === 7) result += '-';
+      else result += characters.charAt(Math.floor(Math.random() * characters.length));
     }
     setCaptchaText(result);
     setUserCaptcha('');
   };
 
-  // Password strength checker
-  const checkPasswordStrength = (text) => {
-    setPassword(text);
-    checkPasswordMatch(text, confirmPassword);
-    
-    let strength = 0;
-    let message = '';
-    let color = '#ff4757';
-
-    if (text.length >= 8) strength++;
-    if (text.match(/[a-z]+/)) strength++;
-    if (text.match(/[A-Z]+/)) strength++;
-    if (text.match(/[0-9]+/)) strength++;
-    if (text.match(/[!@#$%^&*(),.?":{}|<>]+/)) strength++;
-
-    switch (strength) {
-      case 0:
-      case 1:
-        message = 'Very Weak';
-        color = '#ff4757';
-        break;
-      case 2:
-        message = 'Weak';
-        color = '#ffa502';
-        break;
-      case 3:
-        message = 'Medium';
-        color = '#ffa502';
-        break;
-      case 4:
-        message = 'Strong';
-        color = '#2ed573';
-        break;
-      case 5:
-        message = 'Very Strong';
-        color = '#2ed573';
-        break;
-    }
-
-    setPasswordStrength({
-      level: strength,
-      message,
-      color
-    });
-  };
-
-  // Check if passwords match
-  const checkPasswordMatch = (pass, confirmPass) => {
-    if (confirmPass.length > 0) {
-      setPasswordMatch(pass === confirmPass);
-    } else {
-      setPasswordMatch(true);
-    }
-  };
-
-  const handleConfirmPasswordChange = (text) => {
-    setConfirmPassword(text);
-    checkPasswordMatch(password, text);
-  };
-
-  // Shake animation for invalid inputs
   const shake = () => {
     Animated.sequence([
       Animated.timing(shakeAnimation, { toValue: 10, duration: 100, useNativeDriver: true }),
@@ -124,8 +51,7 @@ const LoginScreen = ({ navigation }) => {
     ]).start();
   };
 
-  // Updated handleLogin with API integration
- const handleLogin = async () => {
+const handleLogin = async () => {
   if (!login || !password) {
     Alert.alert('Error', 'Please enter both login and password');
     shake();
@@ -142,42 +68,43 @@ const LoginScreen = ({ navigation }) => {
   setIsLoading(true);
 
   try {
-    // Call API
-    const response = await authAPI.login(login, password);
+    const result = await authLogin(login, password);
+    console.log("Login result:", result);
 
-    // Check response
-    if (response.data.success) {
-      // Save token & user info
-      await AsyncStorage.setItem('userToken', response.data.token);
-      await AsyncStorage.setItem('userData', JSON.stringify(response.data.user));
+    if (result.success) {
+      const role = parseInt(result.user?.role); // <-- ensure number
+      console.log("User role:", role);
 
-      // Navigate based on role
-      switch (response.data.user.role) {
-        case 1:
-          navigation.navigate('AdminDashboard');
-          break;
-        case 2:
-          navigation.navigate('UserDashboard');
-          break;
-        case 3:
-          navigation.navigate('ResolverDashboard');
-          break;
-        case 4:
-          navigation.navigate('AssignerDashboard');
-          break;
-        default:
-          navigation.navigate('Home');
+      const dashboards = {
+        1: "AdminDashboard",
+        2: "UserDashboard",
+        3: "ResolverDashboard",
+        4: "AssignerDashboard"
+      };
+
+      const targetScreen = dashboards[role];
+
+      if (!targetScreen) {
+        Alert.alert("Navigation Error", "Dashboard not found for your role");
+        generateCaptcha();
+        return;
       }
+
+      // Navigate to dashboard
+      navigation.reset({
+        index: 0,
+        routes: [{ name: targetScreen }],
+      });
+
     } else {
-      Alert.alert('Login Failed', response.data.message || 'Invalid credentials');
+      const firstError = Object.values(result.errors || {})[0]?.[0] || result.message;
+      Alert.alert('Login Failed', firstError);
       generateCaptcha();
     }
-  } catch (error) {
-    console.log('Login error:', error.response?.data || error.message);
-    Alert.alert(
-      'Login Failed',
-      error.response?.data?.message || 'Invalid credentials. Please try again.'
-    );
+
+  } catch (err) {
+    console.error("Login exception:", err);
+    Alert.alert('Login Failed', 'Something went wrong. Please try again.');
     generateCaptcha();
   } finally {
     setIsLoading(false);
@@ -185,28 +112,16 @@ const LoginScreen = ({ navigation }) => {
 };
 
 
-  // Initialize CAPTCHA on component mount
-  React.useEffect(() => {
-    generateCaptcha();
-  }, []);
+  useEffect(() => { generateCaptcha(); }, []);
 
-  // Fixed Wiggly CAPTCHA Character Component without width animation
-  const WigglyChar = ({ char, index }) => {
+  const WigglyChar = ({ char }) => {
     const rotation = useRef(new Animated.Value(Math.random() * 20 - 10)).current;
 
-    React.useEffect(() => {
+    useEffect(() => {
       const animate = () => {
         Animated.sequence([
-          Animated.timing(rotation, {
-            toValue: Math.random() * 40 - 20,
-            duration: 2000,
-            useNativeDriver: true,
-          }),
-          Animated.timing(rotation, {
-            toValue: Math.random() * 40 - 20,
-            duration: 2000,
-            useNativeDriver: true,
-          }),
+          Animated.timing(rotation, { toValue: Math.random() * 40 - 20, duration: 2000, useNativeDriver: true }),
+          Animated.timing(rotation, { toValue: Math.random() * 40 - 20, duration: 2000, useNativeDriver: true }),
         ]).start(() => animate());
       };
       animate();
@@ -214,19 +129,14 @@ const LoginScreen = ({ navigation }) => {
 
     return (
       <Animated.Text
-        style={[
-          styles.captchaChar,
-          {
-            transform: [
-              { 
-                rotate: rotation.interpolate({
-                  inputRange: [-20, 20],
-                  outputRange: ['-20deg', '20deg']
-                }) 
-              }
-            ]
-          }
-        ]}
+        style={{
+          fontSize: 32,
+          fontWeight: 'bold',
+          color: '#2a5298',
+          marginHorizontal: 2,
+          fontFamily: 'monospace',
+          transform: [{ rotate: rotation.interpolate({ inputRange: [-20, 20], outputRange: ['-20deg', '20deg'] }) }]
+        }}
       >
         {char}
       </Animated.Text>
@@ -239,77 +149,29 @@ const LoginScreen = ({ navigation }) => {
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
       <StatusBar barStyle="light-content" translucent backgroundColor="transparent" />
-      
-      {/* Fixed Navbar - Exactly as you specified */}
+
+      {/* Navbar */}
       <View style={styles.navbar}>
         <View style={styles.navbarContent}>
-          {/* Logo Container with Gradient */}
-          <LinearGradient
-            colors={[Colors.primary, Colors.secondary]}
-            style={styles.logoContainer}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
-          >
-            <Image 
-              source={require('../assets/images/crp.png')}
-              style={styles.logo}
-              resizeMode="contain"
-            />
+          <LinearGradient colors={[Colors.primary, Colors.secondary]} style={styles.logoContainer}>
+            <Image source={require('../assets/images/crp.png')} style={styles.logo} resizeMode="contain" />
             <Text style={styles.navbarTitle}>Change Request Portal</Text>
           </LinearGradient>
-
-          {/* Navigation Links */}
-          <TouchableOpacity>
-            <LinearGradient
-              colors={[Colors.primary, Colors.secondary]}
-              style={styles.signInButton}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
-            >
-              <Text style={styles.signInButtonText}>Sign In</Text>
-            </LinearGradient>
-          </TouchableOpacity>
         </View>
       </View>
 
-      {/* Main Content - Your existing login screen */}
-      <LinearGradient
-        colors={[Colors.dark, Colors.primary, Colors.dark]}
-        style={styles.background}
-      >
-        <ScrollView
-          contentContainerStyle={styles.scrollContent}
-          keyboardShouldPersistTaps="handled"
-        >
-          {/* Sign In Container */}
+      {/* Main Login */}
+      <LinearGradient colors={[Colors.dark, Colors.primary, Colors.dark]} style={styles.background}>
+        <ScrollView contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled">
           <View style={styles.signInContainer}>
             <Animated.View style={[styles.cardContainer, { transform: [{ translateX: shakeAnimation }] }]}>
-              <LinearGradient
-                colors={['#ffffff', '#f8f9fa', '#ffffff']}
-                style={styles.cardGradient}
-              >
-                
-                {/* Logo */}
-                <View style={styles.logoContainerCard}>
-                  <LinearGradient
-                    colors={[Colors.primary, Colors.secondary]}
-                    style={styles.logoCircleCard}
-                  >
-                    <Image 
-                      source={require('../assets/images/crp.png')}
-                      style={styles.loginCardLogo}
-                      resizeMode="contain"
-                    />
-                  </LinearGradient>
-                </View>
+              <LinearGradient colors={['#ffffff', '#f8f9fa', '#ffffff']} style={styles.cardGradient}>
 
-                {/* Title */}
                 <View style={styles.header}>
                   <Text style={styles.title}>Sign In to CRP</Text>
                   <Text style={styles.subtitle}>Access Your Change Request Portal</Text>
                 </View>
 
-                {/* Email / CNIC */}
                 <View style={styles.inputWrapper}>
                   <Icon name="user" size={20} color={Colors.secondary} style={styles.inputIcon} />
                   <TextInput
@@ -322,7 +184,6 @@ const LoginScreen = ({ navigation }) => {
                   />
                 </View>
 
-                {/* Password */}
                 <View style={styles.inputWrapper}>
                   <Icon name="lock" size={20} color={Colors.secondary} style={styles.inputIcon} />
                   <TextInput
@@ -334,30 +195,21 @@ const LoginScreen = ({ navigation }) => {
                     secureTextEntry={!showPassword}
                   />
                   <TouchableOpacity onPress={() => setShowPassword(!showPassword)}>
-                    <Icon
-                      name={showPassword ? 'eye-slash' : 'eye'}
-                      size={20}
-                      color="#666"
-                    />
+                    <Icon name={showPassword ? 'eye-slash' : 'eye'} size={20} color="#666" />
                   </TouchableOpacity>
                 </View>
 
-                {/* CAPTCHA Section with Wiggly Text */}
+                {/* CAPTCHA */}
                 <View style={styles.captchaContainer}>
                   <View style={styles.captchaHeader}>
                     <Text style={styles.captchaTitle}>SECURITY VERIFICATION</Text>
                   </View>
-                  
                   <View style={styles.captchaDisplay}>
                     <View style={styles.captchaTextContainer}>
-                      {captchaText.split('').map((char, index) => (
-                        <WigglyChar key={index} char={char} index={index} />
-                      ))}
+                      {captchaText.split('').map((char, index) => <WigglyChar key={index} char={char} />)}
                     </View>
                   </View>
-                  
                   <Text style={styles.captchaInstruction}>Type the code you see above:</Text>
-                  
                   <View style={styles.captchaInputWrapper}>
                     <TextInput
                       style={styles.captchaInput}
@@ -374,58 +226,20 @@ const LoginScreen = ({ navigation }) => {
                   </View>
                 </View>
 
-                {/* Forgot Password */}
-                <TouchableOpacity style={styles.forgotPassword}>
-                  <Text style={styles.forgotPasswordText}>Forgot Password?</Text>
-                </TouchableOpacity>
-
-                {/* Login Button */}
-                <TouchableOpacity 
-                  style={[styles.loginButton, isLoading && styles.loginButtonDisabled]} 
+                <TouchableOpacity
+                  style={[styles.loginButton, isLoading && styles.loginButtonDisabled]}
                   onPress={handleLogin}
                   disabled={isLoading}
                 >
-                  <LinearGradient
-                    colors={[Colors.primary, Colors.secondary]}
-                    style={styles.loginButtonGradient}
-                  >
-                    {isLoading ? (
-                      <ActivityIndicator color={Colors.accent} size="small" />
-                    ) : (
-                      <Text style={styles.loginButtonText}>Sign In</Text>
-                    )}
+                  <LinearGradient colors={[Colors.primary, Colors.secondary]} style={styles.loginButtonGradient}>
+                    {isLoading ? <ActivityIndicator color={Colors.accent} size="small" /> : <Text style={styles.loginButtonText}>Sign In</Text>}
                   </LinearGradient>
                 </TouchableOpacity>
 
-                {/* Footer inside card */}
-                <Text style={styles.cardFooterText}>
-                  By signing in, you agree to our{' '}
-                  <Text style={styles.link}>Terms of Service</Text> and{' '}
-                  <Text style={styles.link}>Privacy Policy</Text>.
-                </Text>
               </LinearGradient>
             </Animated.View>
           </View>
         </ScrollView>
-      </LinearGradient>
-
-      {/* Footer - Exactly as you specified */}
-      <LinearGradient
-        colors={[Colors.primary, Colors.secondary]}
-        style={styles.footer}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
-      >
-        <View style={styles.footerContent}>
-          <Image 
-            source={require('../assets/images/crp.png')}
-            style={styles.footerLogo}
-            resizeMode="contain"
-          />
-          <Text style={styles.footerText}>
-            A project of Government of the Punjab
-          </Text>
-        </View>
       </LinearGradient>
     </KeyboardAvoidingView>
   );

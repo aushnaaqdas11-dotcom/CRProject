@@ -2,25 +2,26 @@
 
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
 class UserRequest extends Model
 {
-    use HasFactory;
-
     protected $table = 'requests';
 
-    protected $fillable = [
+      protected $fillable = [
         'user_id',
+        'assigned_to',
+        'assigner_comment',
+        'query_id',
         'project_id',
         'priority',
         'request_details',
         'status',
-        'assigned_to',
-        'assigner_comment',
-        'resolver_comment',
-        'hours_worked'
+    ];
+
+    protected $casts = [
+        'created_at' => 'datetime',
+        'updated_at' => 'datetime',
     ];
 
     public function user()
@@ -28,8 +29,13 @@ class UserRequest extends Model
         return $this->belongsTo(User::class, 'user_id');
     }
 
-    public function project()
+   public function project()
+{
+    return $this->belongsTo(Project::class, 'project_id');
+}
+
+    public function service()
     {
-        return $this->belongsTo(Project::class, 'project_id');
+        return $this->belongsTo(Query::class, 'query_id');
     }
 }

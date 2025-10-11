@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -10,13 +10,24 @@ import api from '../services/apiService';
 import { useAuth } from '../context/AuthContext';
 
 const UserHistoryScreen = () => {
-  const { token } = useAuth();
+  const { token, logout } = useAuth();
   const [requests, setRequests] = useState([]);
   const [error, setError] = useState(null);
+  const intervalRef = useRef(null);
 
   useEffect(() => {
+    if (!token) return;
     fetchData();
-  }, []);
+    startAutoRefresh();
+
+    return () => clearInterval(intervalRef.current);
+  }, [token]);
+
+  const startAutoRefresh = () => {
+    intervalRef.current = setInterval(() => {
+      fetchRecentRequests();
+    }, 60000); // every 60 seconds
+  };
 
   const fetchData = async () => {
     try {
@@ -27,13 +38,31 @@ const UserHistoryScreen = () => {
         setError(null);
         console.log('History requests:', response.data.requests);
       }
-    } catch (error) {
-      console.error(
-        'History fetch error:',
-        error.response ? error.response.data : error.message,
-      );
+    } catch (err) {
+      handleApiError(err);
+    }
+  };
+
+  const fetchRecentRequests = async () => {
+    try {
+      const headers = { Authorization: `Bearer ${token}` };
+      const response = await api.get('/user/history', { headers });
+      if (response.data.success) setRequests(response.data.requests || []);
+    } catch (err) {
+      console.error('Auto-refresh error:', err.response ? err.response.data : err.message);
+    }
+  };
+
+  const handleApiError = (err) => {
+    console.error(
+      'History fetch error:',
+      err.response ? err.response.data : err.message
+    );
+    if (err.response && err.response.status === 401) {
+      logout();
+    } else {
       setError(
-        'Failed to load history. Please try again or check server status.',
+        'Failed to load history. Please try again or check server status.'
       );
     }
   };
@@ -66,8 +95,7 @@ const UserHistoryScreen = () => {
             ]}
           >
             <View style={styles.requestHeader}>
-              <Text style={styles.serviceName}>{req.query?.name || 'N/A'}</Text>{' '}
-              {/* Use query.name for service */}
+              <Text style={styles.serviceName}>{req.query?.name || 'N/A'}</Text>
               <Text
                 style={[
                   styles.priorityBadge,

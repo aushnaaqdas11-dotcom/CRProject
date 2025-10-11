@@ -1,42 +1,62 @@
-import React, { createContext, useState, useContext } from 'react';
+import React, { createContext, useContext, useState, useEffect } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import api from '../services/apiService';
+import axios from 'axios';
 
 const AuthContext = createContext();
 
 export const AuthProvider = ({ children }) => {
-  const [token, setToken] = useState(null);
   const [user, setUser] = useState(null);
+  const [token, setToken] = useState(null);
 
-  const login = async (newToken, userData) => {
-    await AsyncStorage.setItem('token', newToken);
-    await AsyncStorage.setItem('user', JSON.stringify(userData));
-    setToken(newToken);
-    setUser(userData);
-  };
+  // Load token and user from storage on app start
+  useEffect(() => {
+    const loadAuth = async () => {
+      const storedToken = await AsyncStorage.getItem('token');
+      const storedUser = await AsyncStorage.getItem('user');
+      if (storedToken && storedUser) {
+        setToken(storedToken);
+        setUser(JSON.parse(storedUser));
+      }
+    };
+    loadAuth();
+  }, []);
 
-  const logout = async () => {
-    await AsyncStorage.removeItem('token');
-    await AsyncStorage.removeItem('user');
-    setToken(null);
-    setUser(null);
-  };
+  const login = async (loginInput, password) => {
+    try {
+      const response = await axios.post('http://192.168.168.107:8000/api/login', {
+        login: loginInput,
+        password,
+      });
 
-  const loadStoredSession = async () => {
-    const storedToken = await AsyncStorage.getItem('token');
-    const storedUser = await AsyncStorage.getItem('user');
-    if (storedToken && storedUser) {
-      setToken(storedToken);
-      setUser(JSON.parse(storedUser));
+      const data = response.data;
+
+      if (data.success) {
+        // Save token and user
+        await AsyncStorage.setItem('token', data.token);
+        await AsyncStorage.setItem('user', JSON.stringify(data.user));
+        setToken(data.token);
+        setUser(data.user);
+      }
+
+      return data;
+    } catch (error) {
+      console.error('Login API Error:', error);
+      return {
+        success: false,
+        message: 'Login failed. Please try again.',
+      };
     }
   };
 
-  React.useEffect(() => {
-    loadStoredSession();
-  }, []);
+  const logout = async () => {
+    setUser(null);
+    setToken(null);
+    await AsyncStorage.removeItem('token');
+    await AsyncStorage.removeItem('user');
+  };
 
   return (
-    <AuthContext.Provider value={{ token, user, login, logout }}>
+    <AuthContext.Provider value={{ user, token, login, logout }}>
       {children}
     </AuthContext.Provider>
   );
