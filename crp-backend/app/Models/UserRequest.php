@@ -2,40 +2,54 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
 class UserRequest extends Model
 {
+    use HasFactory;
+
     protected $table = 'requests';
 
-      protected $fillable = [
+    protected $fillable = [
         'user_id',
-        'assigned_to',
-        'assigner_comment',
         'query_id',
         'project_id',
         'priority',
         'request_details',
         'status',
+        'sub_query',
+        'source',
     ];
 
-    protected $casts = [
-        'created_at' => 'datetime',
-        'updated_at' => 'datetime',
-    ];
+    // Relations
+    public function service()
+    {
+        return $this->belongsTo(Query::class, 'query_id');
+    }
+
+    public function project()
+    {
+        return $this->belongsTo(Project::class, 'project_id');
+    }
 
     public function user()
     {
         return $this->belongsTo(User::class, 'user_id');
     }
 
-   public function project()
-{
-    return $this->belongsTo(Project::class, 'project_id');
-}
-
-    public function service()
+    public function assigner()
     {
-        return $this->belongsTo(Query::class, 'query_id');
+        return $this->hasOne(Assigner::class, 'request_id');
+    }
+
+    public function assignedDeveloper()
+    {
+        return $this->assigner ? $this->assigner->developer : null;
+    }
+
+    public function getAssignerCommentAttribute()
+    {
+        return $this->assigner ? $this->assigner->assigner_comment : null;
     }
 }

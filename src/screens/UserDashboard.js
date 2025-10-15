@@ -1,35 +1,16 @@
-import React, { useState, useEffect } from 'react';
-import { View, Text, ScrollView, StyleSheet, TouchableOpacity, Dimensions, TextInput } from 'react-native';
+import React, { useState, useEffect, useRef } from 'react';
+import {
+  View, Text, ScrollView, StyleSheet, TouchableOpacity,
+  TextInput, ActivityIndicator
+} from 'react-native';
 import { Picker } from '@react-native-picker/picker';
-import api from '../services/apiService';
 import { useAuth } from '../context/AuthContext';
 import { useNavigation } from '@react-navigation/native';
 
-class ErrorBoundary extends React.Component {
-  state = { hasError: false };
-
-  static getDerivedStateFromError(error) {
-    return { hasError: true };
-  }
-
-  componentDidCatch(error, errorInfo) {
-    console.error('ErrorBoundary caught:', error, errorInfo);
-  }
-
-  render() {
-    if (this.state.hasError) {
-      return <Text>Something went wrong. Please restart the app.</Text>;
-    }
-    return this.props.children;
-  }
-}
-
-const { width } = Dimensions.get('window');
-const isWide = width > 600;
-
 const UserDashboard = () => {
-  const { token, user, logout } = useAuth();
+  const { user, userApi, logout } = useAuth();
   const navigation = useNavigation();
+
   const [services, setServices] = useState([]);
   const [webProjects, setWebProjects] = useState([]);
   const [appProjects, setAppProjects] = useState([]);
@@ -39,273 +20,213 @@ const UserDashboard = () => {
   const [priority, setPriority] = useState('normal');
   const [requestDetails, setRequestDetails] = useState('');
   const [recentRequests, setRecentRequests] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [notification, setNotification] = useState({ message: '', type: '' });
+  const intervalRef = useRef(null);
 
   useEffect(() => {
-    if (!token) {
-      navigation.reset({ index: 0, routes: [{ name: 'Login' }] });
-      return;
-    }
-    fetchData();
-  }, [token]);
+    fetchDashboardData();
+    intervalRef.current = setInterval(fetchDashboardData, 60000);
+    return () => clearInterval(intervalRef.current);
+  }, []);
 
-  const fetchData = async () => {
+  useEffect(() => setSelectedProject(''), [targetType]);
+
+  const fetchDashboardData = async () => {
+    setLoading(true);
     try {
-      const headers = { Authorization: `Bearer ${token}` };
-      const [servicesRes, webRes, appRes, recentRes] = await Promise.all([
-        api.get('/services', { headers }),
-        api.get('/projects/web', { headers }),
-        api.get('/projects/app', { headers }),
-        api.get('/user/requests/recent', { headers }),
+      const [servicesRes, webRes, appRes, recentRes] = await Promise.allSettled([
+        userApi.getServices(),
+        userApi.getProjects('web'),
+        userApi.getProjects('app'),
+        userApi.getRecentRequests(),
       ]);
 
-      if (servicesRes.data.success) setServices(servicesRes.data.services || []);
-      if (webRes.data.success) setWebProjects(webRes.data.projects || []);
-      if (appRes.data.success) setAppProjects(appRes.data.projects || []);
-      if (recentRes.data.success) setRecentRequests(recentRes.data.requests || []);
-    } catch (error) {
-      console.error('Fetch error:', error.response ? error.response.data : error.message);
-      if (error.response && error.response.status === 401) {
-        logout();
-        navigation.reset({ index: 0, routes: [{ name: 'Login' }] });
-      } else {
-        showNotification('Failed to load data', 'error');
-      }
+      setServices(servicesRes.status === 'fulfilled' ? servicesRes.value.data.services || [] : []);
+      setWebProjects(webRes.status === 'fulfilled' ? webRes.value.data.projects || [] : []);
+      setAppProjects(appRes.status === 'fulfilled' ? appRes.value.data.projects || [] : []);
+      setRecentRequests(recentRes.status === 'fulfilled' ? recentRes.value.data.requests || [] : []);
+
+      if (servicesRes.status === 'rejected') showNotification('Failed to load services', 'error');
+      if (webRes.status === 'rejected') showNotification('Failed to load web projects', 'error');
+      if (appRes.status === 'rejected') showNotification('Failed to load app projects', 'error');
+      if (recentRes.status === 'rejected') showNotification('Failed to load recent requests', 'error');
+    } catch (err) {
+      console.error('Dashboard error:', err);
+      showNotification('Failed to load dashboard data', 'error');
+    } finally {
+      setLoading(false);
     }
   };
 
   const showNotification = (message, type = 'success') => {
     setNotification({ message, type });
-    setTimeout(() => setNotification({ message: '', type: '' }), 5000);
+    setTimeout(() => setNotification({ message: '', type: '' }), 4000);
   };
 
   const handleSubmit = async () => {
-    if (!selectedService || !selectedProject || !requestDetails) {
+    if (!selectedService || !selectedProject || !requestDetails.trim()) {
       showNotification('Please fill all fields', 'error');
       return;
     }
 
     try {
-      const headers = { Authorization: `Bearer ${token}` };
-      const data = {
+      const payload = {
         query_id: selectedService,
         project_id: selectedProject,
         priority,
-        request_details: requestDetails,
+        request_details: requestDetails
       };
-      const response = await api.post('/change-request', data, { headers });
+      const res = await userApi.submitChangeRequest(payload);
 
-      if (response.data.success) {
-        showNotification('Request submitted', 'success');
-        setRequestDetails('');
+      if (!res.data.success) {
+        const messages = res.data.errors ? Object.values(res.data.errors).flat().join('\n') : res.data.message;
+        showNotification(messages || 'Request failed', 'error');
+      } else {
+        showNotification(res.data.message || 'Request submitted successfully', 'success');
         setSelectedService('');
         setSelectedProject('');
-        fetchData();
+        setRequestDetails('');
+        fetchDashboardData();
       }
-    } catch (error) {
-      console.error('Submit error:', error.response ? error.response.data : error.message);
-      showNotification('Failed to submit', 'error');
+    } catch (err) {
+      console.error('Submit error:', err);
+      showNotification(err.response?.data?.message || 'Error submitting request', 'error');
     }
   };
 
   const handleLogout = async () => {
-    try {
-      const headers = { Authorization: `Bearer ${token}` };
-      await api.post('/logout', {}, { headers });
-      logout();
-      navigation.reset({ index: 0, routes: [{ name: 'Login' }] });
-    } catch (error) {
-      console.error('Logout error:', error.response ? error.response.data : error.message);
-      showNotification('Logout failed', 'error');
+    const result = await logout();
+    if (result.success) {
+      navigation.navigate('Login');
+    } else {
+      showNotification(result.message, 'error');
     }
   };
 
+  if (loading) return (
+    <View style={styles.loader}>
+      <ActivityIndicator size="large" color="#4e8cff" />
+      <Text>Loading dashboard...</Text>
+    </View>
+  );
+
   return (
-    <ErrorBoundary>
-      <ScrollView style={styles.container}>
-        {notification.message && (
-          <View style={[styles.notification, notification.type === 'error' ? styles.error : styles.success]}>
-            <Text>{notification.message}</Text>
-          </View>
-        )}
+    <ScrollView style={styles.container}>
+      {notification.message && (
+        <View style={[styles.notification, notification.type === 'error' ? styles.error : styles.success]}>
+          <Text style={{ color: 'white' }}>{notification.message}</Text>
+        </View>
+      )}
 
-        <View style={styles.header}>
-          <Text style={styles.logo}>
-            SU<Text style={styles.logoSpan}>per</Text>
-          </Text>
-          <View style={styles.userInfo}>
-            <View style={styles.userAvatar}>
-              <Text style={styles.avatarText}>{user?.name ? user.name.substring(0, 2).toUpperCase() : 'SU'}</Text>
-            </View>
-            <View>
-              <Text style={styles.userName}>{user?.name || 'Super Admin'}</Text>
-              <Text style={styles.userEmail}>{user?.email || 'user@example.com'}</Text>
-            </View>
+      <View style={styles.header}>
+        <Text style={styles.logo}>SU<Text style={styles.logoSpan}>per</Text></Text>
+        <View style={styles.userInfo}>
+          <View style={styles.userAvatar}>
+            <Text style={styles.avatarText}>{user?.name?.substring(0,2).toUpperCase() || 'SU'}</Text>
           </View>
-          <View style={styles.actionButtons}>
-            <TouchableOpacity style={styles.viewHistoryBtn} onPress={() => navigation.navigate('UserHistory')}>
-              <Text style={styles.btnText}>View All History</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.logoutBtn} onPress={handleLogout}>
-              <Text style={styles.btnText}>Logout</Text>
-            </TouchableOpacity>
+          <View>
+            <Text style={styles.userName}>{user?.name || 'Super User'}</Text>
+            <Text style={styles.userEmail}>{user?.email || 'user@example.com'}</Text>
+            <Text style={styles.userEmail}>Role: {user?.role || 'N/A'}</Text>
           </View>
         </View>
-
-        <Text style={styles.dashboardTitle}>Project Enhancement Portal</Text>
-
-        <View style={[styles.dashboardGrid, isWide && { flexDirection: 'row' }]}>
-          <View style={styles.requestForm}>
-            <Text style={styles.formTitle}>Submit Change Request</Text>
-            <View style={styles.formGroup}>
-              <Text style={styles.label}>Services Count: {services.length}</Text>
-              <Text style={styles.label}>Web Projects Count: {webProjects.length}</Text>
-              <Text style={styles.label}>App Projects Count: {appProjects.length}</Text>
-            </View>
-
-            <View style={styles.formGroup}>
-              <Text style={styles.label}>Service Needed</Text>
-              <Picker
-                selectedValue={selectedService}
-                onValueChange={(value) => setSelectedService(value)}
-                style={styles.select}
-              >
-                <Picker.Item label="Select a service" value="" />
-                {services.map((s) => (
-                  <Picker.Item key={s.id} label={s.name} value={s.id} />
-                ))}
-              </Picker>
-            </View>
-
-            <View style={styles.formGroup}>
-              <Text style={styles.label}>Select Project Type</Text>
-              <View style={styles.radioGroup}>
-                <TouchableOpacity
-                  style={[styles.radioOption, targetType === 'web' && styles.radioSelected]}
-                  onPress={() => setTargetType('web')}
-                >
-                  <Text style={[styles.radioText, targetType === 'web' && styles.radioTextSelected]}>Web</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={[styles.radioOption, targetType === 'app' && styles.radioSelected]}
-                  onPress={() => setTargetType('app')}
-                >
-                  <Text style={[styles.radioText, targetType === 'app' && styles.radioTextSelected]}>App</Text>
-                </TouchableOpacity>
-              </View>
-            </View>
-
-            <View style={styles.formGroup}>
-              <Text style={styles.label}>{targetType === 'web' ? 'Select Web Project' : 'Select App Project'}</Text>
-              <Picker
-                selectedValue={selectedProject}
-                onValueChange={(value) => setSelectedProject(value)}
-                style={styles.select}
-                enabled={!!targetType}
-              >
-                <Picker.Item label={`Select ${targetType === 'web' ? 'Web Project' : 'App Project'}`} value="" />
-                {(targetType === 'web' ? webProjects : appProjects).map((p) => (
-                  <Picker.Item key={p.id} label={p.name} value={p.id} />
-                ))}
-              </Picker>
-            </View>
-
-            <View style={styles.formGroup}>
-              <Text style={styles.label}>Priority Level</Text>
-              <View style={styles.priorityGroup}>
-                <TouchableOpacity
-                  style={[styles.priorityOption, priority === 'high' && styles.priorityHighSelected]}
-                  onPress={() => setPriority('high')}
-                >
-                  <Text style={[styles.priorityText, priority === 'high' && styles.priorityTextSelected]}>High</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={[styles.priorityOption, priority === 'normal' && styles.priorityNormalSelected]}
-                  onPress={() => setPriority('normal')}
-                >
-                  <Text style={[styles.priorityText, priority === 'normal' && styles.priorityTextSelected]}>Normal</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={[styles.priorityOption, priority === 'low' && styles.priorityLowSelected]}
-                  onPress={() => setPriority('low')}
-                >
-                  <Text style={[styles.priorityText, priority === 'low' && styles.priorityTextSelected]}>Anytime</Text>
-                </TouchableOpacity>
-              </View>
-            </View>
-
-            <View style={styles.formGroup}>
-              <Text style={styles.label}>Change Request Details</Text>
-              <TextInput
-                style={styles.textarea}
-                multiline
-                placeholder="Please describe the changes you need in detail..."
-                value={requestDetails}
-                onChangeText={setRequestDetails}
-              />
-            </View>
-
-            <TouchableOpacity style={styles.submitBtn} onPress={handleSubmit}>
-              <Text style={styles.btnText}>Submit Request</Text>
-            </TouchableOpacity>
-          </View>
-
-          <View style={styles.requestsHistory}>
-            <Text style={styles.historyTitle}>Recent Requests</Text>
-            {recentRequests.length === 0 ? (
-              <Text style={styles.noRequests}>No active requests found.</Text>
-            ) : (
-              recentRequests.map((req) => (
-                <View
-                  key={req.id}
-                  style={[
-                    styles.requestCard,
-                    req.priority === 'high' && styles.requestCardHigh,
-                    req.priority === 'low' && styles.requestCardLow,
-                  ]}
-                >
-                  <View style={styles.requestHeader}>
-                    <Text style={styles.serviceName}>{req.related_query?.name || 'No Service'}</Text>
-                    <Text
-                      style={[
-                        styles.priorityBadge,
-                        req.priority === 'high' && styles.priorityBadgeHigh,
-                        req.priority === 'normal' && styles.priorityBadgeNormal,
-                        req.priority === 'low' && styles.priorityBadgeLow,
-                      ]}
-                    >
-                      {req.priority.charAt(0).toUpperCase() + req.priority.slice(1)}
-                    </Text>
-                  </View>
-                  <Text style={styles.projectName}>
-                    Source: {req.project?.type === 'app' ? 'App' : 'Web'} - {req.project?.name || 'N/A'}
-                  </Text>
-                  <Text style={styles.requestDate}>
-                    Submitted on: {new Date(req.created_at).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}
-                  </Text>
-                  <Text style={styles.requestContent}>{req.request_details || 'No details'}</Text>
-                  <Text
-                    style={[
-                      styles.statusBadge,
-                      req.status === 'pending' && styles.statusPending,
-                      req.status === 'inprogress' && styles.statusInprogress,
-                      req.status === 'completed' && styles.statusCompleted,
-                    ]}
-                  >
-                    {req.status.charAt(0).toUpperCase() + req.status.slice(1)}
-                  </Text>
-                </View>
-              ))
-            )}
-          </View>
+        <View style={styles.actionButtons}>
+          <TouchableOpacity style={styles.viewHistoryBtn} onPress={() => navigation.navigate('UserHistory')}>
+            <Text style={styles.btnText}>View All History</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.viewHistoryBtn} onPress={handleLogout}>
+            <Text style={styles.btnText}>Logout</Text>
+          </TouchableOpacity>
         </View>
-      </ScrollView>
-    </ErrorBoundary>
+      </View>
+
+      <Text style={styles.dashboardTitle}>Project Enhancement Portal</Text>
+      <View style={styles.requestForm}>
+        <Text style={styles.formTitle}>Submit Change Request</Text>
+
+        <Text style={styles.label}>Service Needed</Text>
+        <Picker selectedValue={selectedService} onValueChange={setSelectedService} style={styles.select}>
+          <Picker.Item label="Select a service" value="" />
+          {services.map(s => <Picker.Item key={s.id} label={s.name} value={s.id} />)}
+        </Picker>
+
+        <Text style={styles.label}>Select Project Type</Text>
+        <View style={styles.radioGroup}>
+          {['web','app'].map(type => (
+            <TouchableOpacity
+              key={type}
+              style={[styles.radioOption, targetType===type && styles.radioSelected]}
+              onPress={() => setTargetType(type)}
+            >
+              <Text style={[styles.radioText, targetType===type && styles.radioTextSelected]}>
+                {type === 'web' ? 'Web' : 'App'}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+
+        <Text style={styles.label}>{targetType==='web' ? 'Select Web Project' : 'Select App Project'}</Text>
+        <Picker selectedValue={selectedProject} onValueChange={setSelectedProject} style={styles.select}>
+          <Picker.Item label={`Select ${targetType==='web'?'Web':'App'} Project`} value="" />
+          {(targetType==='web'?webProjects:appProjects).map(p =>
+            <Picker.Item key={p.id} label={p.name} value={p.id} />
+          )}
+        </Picker>
+
+        <Text style={styles.label}>Priority Level</Text>
+        <View style={styles.priorityGroup}>
+          {['high','normal','low'].map(lvl => (
+            <TouchableOpacity
+              key={lvl}
+              style={[styles.priorityOption, priority===lvl &&
+                (lvl==='high'?styles.priorityHighSelected: lvl==='normal'?styles.priorityNormalSelected:styles.priorityLowSelected)]}
+              onPress={()=>setPriority(lvl)}
+            >
+              <Text style={[styles.priorityText, priority===lvl && styles.priorityTextSelected]}>
+                {lvl==='low'?'Anytime':lvl.charAt(0).toUpperCase()+lvl.slice(1)}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+
+        <Text style={styles.label}>Change Request Details</Text>
+        <TextInput
+          style={styles.textarea}
+          multiline
+          placeholder="Describe the changes you need..."
+          value={requestDetails}
+          onChangeText={setRequestDetails}
+        />
+
+        <TouchableOpacity style={styles.submitBtn} onPress={handleSubmit}>
+          <Text style={styles.btnText}>Submit Request</Text>
+        </TouchableOpacity>
+      </View>
+
+      <View style={styles.requestsHistory}>
+        <Text style={styles.historyTitle}>Recent Requests</Text>
+        {recentRequests.length===0 ? <Text style={styles.noRequests}>No recent requests found.</Text> :
+          recentRequests.map(req => (
+            <View key={req.id} style={styles.requestCard}>
+              <Text style={styles.serviceName}>{req.service?.name || 'No Service'}</Text>
+              <Text style={styles.projectName}>Source: {req.project?.type==='app'?'App':'Web'} - {req.project?.name||'N/A'}</Text>
+              <Text style={styles.requestDate}>{new Date(req.created_at).toLocaleDateString()}</Text>
+              <Text style={styles.requestContent}>{req.request_details || 'No details'}</Text>
+              <Text style={[styles.statusBadge,
+                req.status==='pending'?styles.statusPending:
+                req.status==='inprogress'?styles.statusInprogress:styles.statusCompleted]}>
+                {req.status?.charAt(0).toUpperCase()+req.status?.slice(1)}
+              </Text>
+            </View>
+          ))
+        }
+      </View>
+    </ScrollView>
   );
 };
 
 const styles = StyleSheet.create({
-  // Keep all your original styles as-is
   container: { flex: 1, backgroundColor: '#e6fffa' },
   header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 15, flexWrap: 'wrap', gap: 10 },
   logo: { fontSize: 22, fontWeight: '700', color: '#2c3e50' },
@@ -317,7 +238,6 @@ const styles = StyleSheet.create({
   userEmail: { fontSize: 12, color: '#7b8788' },
   actionButtons: { flexDirection: 'row', gap: 10, flexWrap: 'wrap' },
   viewHistoryBtn: { backgroundColor: '#34d399', padding: 10, borderRadius: 6, alignItems: 'center' },
-  logoutBtn: { backgroundColor: '#ff6b6b', padding: 10, borderRadius: 6, alignItems: 'center' },
   btnText: { color: 'white', fontWeight: '600' },
   dashboardTitle: { fontSize: 26, margin: 20, color: '#2c3e50', textAlign: 'center' },
   dashboardGrid: { flexDirection: 'column', padding: 10, gap: 20 },

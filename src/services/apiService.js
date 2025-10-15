@@ -1,46 +1,78 @@
 import axios from 'axios';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 
-const BASE_URL = 'http://192.168.168.107:8000/api'; // Your local server
+const BASE_URL = 'http://10.50.206.72:8000/api'; // Replace with your actual backend URL
 
-const api = axios.create({
+const apiService = axios.create({
   baseURL: BASE_URL,
   headers: {
     'Content-Type': 'application/json',
-    'Accept': 'application/json',
   },
-  timeout: 20000,
 });
 
-// Attach token automatically
-api.interceptors.request.use(async (config) => {
-  const token = await AsyncStorage.getItem('token');
-  if (token) config.headers.Authorization = `Bearer ${token}`;
-  return config;
-});
-
-api.interceptors.response.use(
+// Interceptor to handle 401 errors
+apiService.interceptors.response.use(
   response => response,
-  async (error) => {
+  error => {
     if (error.response?.status === 401) {
-      await AsyncStorage.removeItem('token');
+      return Promise.reject({ message: 'Session expired. Please log in again.' });
     }
     return Promise.reject(error);
   }
 );
 
-export const authAPI = {
-  login: (login, password) => api.post('/login', { login, password }),
-  logout: () => api.post('/logout'),
-};
+let authToken = null;
 
-export const userAPI = {
-  getDashboard: () => api.get('/user/dashboard'),
-  getHistory: () => api.get('/user/history'),
-  submitChangeRequest: (data) => api.post('/change-request', data),
-  getQueries: () => api.get('/queries'),
-  getSubQueries: (queryId) => api.get(`/sub-queries/${queryId}`),
-  getProjects: () => api.get('/projects'),
-};
+export default {
+  setAuthToken(token) {
+    authToken = token;
+    if (token) {
+      apiService.defaults.headers.common['Authorization'] = `Bearer ${token}`;
+    } else {
+      delete apiService.defaults.headers.common['Authorization'];
+    }
+  },
 
-export default api;
+  async login(login, password) {
+    return apiService.post('/login', { login, password });
+  },
+
+  async logout() {
+    return apiService.post('/logout');
+  },
+
+  async getUserDashboard() {
+    return apiService.get('/user/dashboard');
+  },
+
+  async getUserHistory() {
+    return apiService.get('/user/history');
+  },
+
+  async getServices() {
+    return apiService.get('/services');
+  },
+
+  async getProjects(type) {
+    return apiService.get(`/projects/${type}`);
+  },
+
+  async getRecentRequests() {
+    return apiService.get('/user/requests/recent');
+  },
+
+  async submitChangeRequest(data) {
+    return apiService.post('/change-request', data);
+  },
+
+  async getProjectRequests() {
+    return apiService.get('/assigner/requests');
+  },
+
+  async assignToDeveloper(data) {
+    return apiService.post('/assigner/assign', data);
+  },
+
+  async getDevelopers() {
+    return apiService.get('/developers');
+  },
+};

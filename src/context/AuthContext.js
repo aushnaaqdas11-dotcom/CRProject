@@ -1,65 +1,105 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useState, useEffect, useContext } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import axios from 'axios';
+import apiService from '../services/apiService';
 
-const AuthContext = createContext();
+export const AuthContext = createContext();
 
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [token, setToken] = useState(null);
+  const [loading, setLoading] = useState(true);
 
-  // Load token and user from storage on app start
   useEffect(() => {
-    const loadAuth = async () => {
-      const storedToken = await AsyncStorage.getItem('token');
-      const storedUser = await AsyncStorage.getItem('user');
-      if (storedToken && storedUser) {
-        setToken(storedToken);
-        setUser(JSON.parse(storedUser));
+    const loadUser = async () => {
+      try {
+        const storedToken = await AsyncStorage.getItem('token');
+        const userData = await AsyncStorage.getItem('user');
+        if (storedToken && userData) {
+          apiService.setAuthToken(storedToken);
+          setUser(JSON.parse(userData));
+          setToken(storedToken);
+        }
+      } catch (error) {
+        console.error('Error loading user:', error);
+      } finally {
+        setLoading(false);
       }
     };
-    loadAuth();
+    loadUser();
   }, []);
 
-  const login = async (loginInput, password) => {
+  const login = async (login, password) => {
     try {
-      const response = await axios.post('http://192.168.168.107:8000/api/login', {
-        login: loginInput,
-        password,
-      });
-
-      const data = response.data;
-
-      if (data.success) {
-        // Save token and user
-        await AsyncStorage.setItem('token', data.token);
-        await AsyncStorage.setItem('user', JSON.stringify(data.user));
-        setToken(data.token);
-        setUser(data.user);
+      const response = await apiService.login(login, password);
+      if (response.data.success) {
+        const { token, user } = response.data;
+        await AsyncStorage.setItem('token', token);
+        await AsyncStorage.setItem('user', JSON.stringify(user));
+        apiService.setAuthToken(token);
+        setUser(user);
+        setToken(token);
+        let redirectTo;
+        switch (parseInt(user.role)) {
+          case 1:
+            redirectTo = 'AdminDashboard';
+            break;
+          case 2:
+            redirectTo = 'UserDashboard';
+            break;
+          case 3:
+            redirectTo = 'ResolverDashboard';
+            break;
+          case 4:
+            redirectTo = 'AssignerDashboard';
+            break;
+          default:
+            redirectTo = 'UserDashboard';
+        }
+        return { success: true, user, redirect_to: redirectTo };
+      } else {
+        return {
+          success: false,
+          message: response.data.message || 'Login failed',
+          errors: response.data.errors || {},
+        };
       }
-
-      return data;
     } catch (error) {
-      console.error('Login API Error:', error);
+      console.error('Login error:', error);
       return {
         success: false,
-        message: 'Login failed. Please try again.',
+        message: error.response?.data?.message || 'Network error. Please try again.',
+        errors: error.response?.data?.errors || {},
       };
     }
   };
 
   const logout = async () => {
-    setUser(null);
-    setToken(null);
-    await AsyncStorage.removeItem('token');
-    await AsyncStorage.removeItem('user');
+    try {
+      await apiService.logout();
+      await AsyncStorage.removeItem('token');
+      await AsyncStorage.removeItem('user');
+      apiService.setAuthToken(null);
+      setUser(null);
+      setToken(null);
+      return { success: true };
+    } catch (error) {
+      console.error('Logout error:', error);
+      return { success: false, message: error.response?.data?.message || 'Failed to logout. Please try again.' };
+    }
   };
 
   return (
-    <AuthContext.Provider value={{ user, token, login, logout }}>
+    <AuthContext.Provider value={{ user, token, login, logout, loading, userApi: apiService }}>
       {children}
     </AuthContext.Provider>
   );
 };
 
-export const useAuth = () => useContext(AuthContext);
+// Add this custom hook
+export const useAuth = () => {
+  const context = useContext(AuthContext);
+  if (context === undefined) {
+    throw new Error('useAuth must be used within an AuthProvider');
+  }
+  return context;
+};

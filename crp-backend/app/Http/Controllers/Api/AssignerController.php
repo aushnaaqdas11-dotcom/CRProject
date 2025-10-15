@@ -3,122 +3,82 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
-use App\Models\UserRequest;
-use App\Models\Project;
-use App\Models\Developer;
 use Illuminate\Http\Request;
+use App\Models\UserRequest;
+use App\Models\Assigner;
+use App\Models\Developer;
+use App\Models\Project;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 
 class AssignerController extends Controller
 {
-    public function dashboard()
+    public function getAssignedProjects()
     {
-        try {
-            $currentAssignerId = Auth::id();
-            
-            $projectIds = Project::where('assigner_id', $currentAssignerId)->pluck('id');
+        $assigner = Auth::user();
 
-            $requests = collect();
-            if ($projectIds->isNotEmpty()) {
-                $requests = UserRequest::with(['user', 'project'])
-                    ->whereIn('project_id', $projectIds)
-                    ->orderByDesc('id')
-                    ->get();
-            }
+        $projectIds = Project::where('assigner_id', $assigner->id)->pluck('id');
 
-            $stats = [
-                'total' => $requests->count(),
-                'pending' => $requests->where('status', 'pending')->count(),
-                'in_progress' => $requests->where('status', 'inprogress')->count(),
-                'completed' => $requests->where('status', 'completed')->count(),
-            ];
+        $projects = Project::whereIn('id', $projectIds)->get();
 
-            return response()->json([
-                'success' => true,
-                'data' => [
-                    'requests' => $requests,
-                    'stats' => $stats
+        return response()->json([
+            'success' => true,
+            'projects' => $projects
+        ]);
+    }
+
+    public function getProjectRequests()
+    {
+        $assigner = Auth::user();
+
+        $projectIds = Project::where('assigner_id', $assigner->id)->pluck('id');
+
+        $requests = UserRequest::with(['user', 'project', 'service', 'assigner.developer'])
+            ->whereIn('project_id', $projectIds)
+            ->get();
+
+        return response()->json([
+            'success' => true,
+            'requests' => $requests
+        ]);
+    }
+
+    public function getDevelopers() {
+    $developers = Developer::all();
+    return response()->json([
+        'success' => true,
+        'developers' => $developers
+    ]);
+}
+
+    public function assignToDeveloper(Request $request)
+    {
+        $validated = $request->validate([
+            'request_id' => 'required|exists:requests,id',
+            'developer_id' => 'required|exists:developers,id',
+            'assigner_comment' => 'nullable|string|max:2000',
+            'status' => 'nullable|in:pending,inprogress,completed'
+        ]);
+
+        DB::transaction(function() use ($validated) {
+            $requestRecord = UserRequest::findOrFail($validated['request_id']);
+
+            Assigner::updateOrCreate(
+                ['request_id' => $validated['request_id']],
+                [
+                    'assigner_id' => Auth::id(),
+                    'developer_id' => $validated['developer_id'],
+                    'assigner_comment' => $validated['assigner_comment'] ?? null,
                 ]
-            ]);
+            );
 
-        } catch (\Exception $e) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Failed to load assigner dashboard',
-                'error' => $e->getMessage()
-            ], 500);
-        }
-    }
+            $requestRecord->status = $validated['status'] ?? 'inprogress';
+            $requestRecord->save();
+        });
 
-    public function show($id)
-    {
-        try {
-            $request = UserRequest::with(['user', 'project'])->findOrFail($id);
-            $developers = Developer::all();
-            
-            return response()->json([
-                'success' => true,
-                'data' => [
-                    'request' => $request,
-                    'developers' => $developers
-                ]
-            ]);
-
-        } catch (\Exception $e) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Request not found',
-                'error' => $e->getMessage()
-            ], 404);
-        }
-    }
-
-    public function getDevelopers()
-    {
-        try {
-            $developers = Developer::all();
-            
-            return response()->json([
-                'success' => true,
-                'data' => $developers
-            ]);
-
-        } catch (\Exception $e) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Failed to fetch developers',
-                'error' => $e->getMessage()
-            ], 500);
-        }
-    }
-
-    public function assign(Request $request, $id)
-    {
-        try {
-            $validatedData = $request->validate([
-                'developer_id' => 'required|exists:developers,id',
-                'assigner_comments' => 'nullable|string|max:1000',
-            ]);
-
-            $userRequest = UserRequest::findOrFail($id);
-            $userRequest->update([
-                'assigned_to' => $validatedData['developer_id'],
-                'assigner_comment' => $validatedData['assigner_comments'],
-                'status' => 'inprogress'
-            ]);
-
-            return response()->json([
-                'success' => true,
-                'message' => 'Developer assigned successfully!',
-                'data' => $userRequest
-            ]);
-
-        } catch (\Exception $e) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Failed to assign developer',
-                'error' => $e->getMessage()
-            ], 500);
-        }
+        return response()->json([
+            'success' => true,
+            'message' => 'Request assigned successfully'
+        ]);
     }
 }
