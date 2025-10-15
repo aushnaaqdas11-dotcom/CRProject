@@ -122,18 +122,16 @@ const UserDashboard = () => {
       {/* Navbar */}
       <View style={styles.navbar}>
         <View style={styles.navbarContent}>
+          {/* Logo Container on Left Side */}
           <LinearGradient colors={[Colors.primary, Colors.secondary]} style={styles.logoContainer}>
             <Text style={styles.navbarTitle}>Change Request Portal</Text>
           </LinearGradient>
+
+          {/* Action Buttons on Right Side - Only View History now */}
           <View style={styles.actionButtons}>
             <TouchableOpacity style={styles.viewHistoryBtn} onPress={() => navigation.navigate('UserHistory')}>
               <LinearGradient colors={[Colors.primary, Colors.secondary]} style={styles.btnGradient}>
                 <Text style={styles.btnText}>View All History</Text>
-              </LinearGradient>
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.viewHistoryBtn} onPress={handleLogout}>
-              <LinearGradient colors={['#EF4444', '#DC2626']} style={styles.btnGradient}>
-                <Text style={styles.btnText}>Logout</Text>
               </LinearGradient>
             </TouchableOpacity>
           </View>
@@ -155,15 +153,20 @@ const UserDashboard = () => {
             </Animatable.View>
           )}
 
-          <View style={styles.userInfo}>
-            <View style={styles.userAvatar}>
-              <Text style={styles.avatarText}>{user?.name?.substring(0,2).toUpperCase() || 'SU'}</Text>
-            </View>
-            <View>
-              <Text style={styles.userName}>{user?.name || 'Super User'}</Text>
-              <Text style={styles.userEmail}>{user?.email || 'user@example.com'}</Text>
-            </View>
+          {/* Super Admin Section */}
+          <View style={styles.superAdminSection}>
+            <Text style={styles.superAdminTitle}>Super Admin</Text>
+            <Text style={styles.superAdminEmail}>{user?.email || 'admin@example.com'}</Text>
+            
+            {/* Logout Button on Left Side */}
+            <TouchableOpacity style={styles.logoutBtn} onPress={handleLogout}>
+              <LinearGradient colors={['#EF4444', '#DC2626']} style={styles.logoutBtnGradient}>
+                <Text style={styles.logoutBtnText}>Logout</Text>
+              </LinearGradient>
+            </TouchableOpacity>
           </View>
+
+          <View style={styles.divider} />
 
           <Animatable.View animation="fadeInDown" duration={800}>
             <Text style={styles.dashboardTitle}>Project Enhancement Portal</Text>
@@ -378,8 +381,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   logoContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
     paddingHorizontal: 20,
     paddingVertical: 10,
     borderRadius: 8,
@@ -413,39 +414,47 @@ const styles = StyleSheet.create({
     fontSize: 14,
   },
   
-  // User Info
-  userInfo: {
-    flexDirection: 'row',
-    alignItems: 'center',
+  // Super Admin Section
+  superAdminSection: {
     marginBottom: 20,
     padding: 16,
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
-    borderRadius: 12,
   },
-  userAvatar: {
-    width: 50,
-    height: 50,
-    borderRadius: 25,
-    backgroundColor: Colors.secondary,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 12,
-  },
-  avatarText: {
-    color: 'white',
-    fontWeight: 'bold',
-    fontSize: 18,
-  },
-  userName: {
-    fontSize: 18,
+  superAdminTitle: {
+    fontSize: 24,
     fontWeight: 'bold',
     color: Colors.accent,
     marginBottom: 4,
   },
-  userEmail: {
-    fontSize: 14,
+  superAdminEmail: {
+    fontSize: 16,
     color: Colors.accent,
     opacity: 0.8,
+    marginBottom: 16,
+  },
+  logoutBtn: {
+    borderRadius: 8,
+    overflow: 'hidden',
+    alignSelf: 'flex-start',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 3,
+    elevation: 2,
+  },
+  logoutBtnGradient: {
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    alignItems: 'center',
+  },
+  logoutBtnText: {
+    color: 'white',
+    fontWeight: '600',
+    fontSize: 14,
+  },
+  divider: {
+    height: 1,
+    backgroundColor: 'rgba(255, 255, 255, 0.3)',
+    marginBottom: 20,
   },
   
   dashboardTitle: {
@@ -507,7 +516,8 @@ const styles = StyleSheet.create({
   spacingLarge: {
     height: 20,
   },
-  crdinputWrapper:{ flexDirection: 'row',
+  crdinputWrapper:{ 
+    flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: '#ffffff',
     borderRadius: 12,
@@ -519,7 +529,8 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 3,
-    elevation: 2,},
+    elevation: 2,
+  },
   inputWrapper: {
     flexDirection: 'row',
     alignItems: 'center',
