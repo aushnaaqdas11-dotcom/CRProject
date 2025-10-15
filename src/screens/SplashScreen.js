@@ -62,7 +62,7 @@ const SplashScreen = ({ navigation }) => {
       <View style={styles.content}>
         <Animated.View
           style={[
-            styles.logoContainer,
+            styles.logosContainer,
             {
               opacity: fadeAnim,
               transform: [
@@ -72,11 +72,23 @@ const SplashScreen = ({ navigation }) => {
             }
           ]}
         >
-          <Image
-            source={require('../assets/images/crp.png')} // Your CRP logo
-            style={styles.logo}
-            resizeMode="contain"
-          />
+          {/* PITB Logo on the left */}
+          <View style={styles.logoWrapper}>
+            <Image
+              source={require('../assets/images/PITBLOGO.png')}
+              style={styles.pitbLogo}
+              resizeMode="contain"
+            />
+          </View>
+
+          {/* CRP Logo on the right */}
+          <View style={styles.logoWrapper}>
+            <Image
+              source={require('../assets/images/crp.png')}
+              style={styles.crpLogo}
+              resizeMode="contain"
+            />
+          </View>
         </Animated.View>
 
         <Animated.View
@@ -97,19 +109,23 @@ const SplashScreen = ({ navigation }) => {
         </Animated.View>
       </View>
 
-      {/* Loading indicator */}
+      {/* Loading indicator - Fixed width animation */}
       <View style={styles.loadingContainer}>
-        <Animated.View 
-          style={[
-            styles.loadingBar,
-            {
-              width: fadeAnim.interpolate({
-                inputRange: [0, 1],
-                outputRange: ['0%', '100%']
-              })
-            }
-          ]} 
-        />
+        <View style={styles.loadingBarBackground}>
+          <Animated.View 
+            style={[
+              styles.loadingBar,
+              {
+                transform: [{
+                  scaleX: fadeAnim.interpolate({
+                    inputRange: [0, 1],
+                    outputRange: [0, 1]
+                  })
+                }]
+              }
+            ]} 
+          />
+        </View>
       </View>
     </LinearGradient>
   );
@@ -125,7 +141,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 100,
   },
-  logoContainer: {
+  logosContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
     marginBottom: 30,
     shadowColor: Colors.dark,
     shadowOffset: {
@@ -136,9 +155,18 @@ const styles = StyleSheet.create({
     shadowRadius: 20,
     elevation: 10,
   },
-  logo: {
-    width: width * 0.4,
-    height: width * 0.4,
+  logoWrapper: {
+    marginHorizontal: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  pitbLogo: {
+    width: width * 0.3,
+    height: width * 0.3,
+  },
+  crpLogo: {
+    width: width * 0.3,
+    height: width * 0.3,
   },
   textContainer: {
     alignItems: 'center',
@@ -163,6 +191,10 @@ const styles = StyleSheet.create({
     position: 'absolute',
     bottom: 100,
     width: width * 0.6,
+    alignItems: 'center',
+  },
+  loadingBarBackground: {
+    width: '100%',
     height: 4,
     backgroundColor: 'rgba(255, 255, 255, 0.3)',
     borderRadius: 2,
@@ -172,6 +204,7 @@ const styles = StyleSheet.create({
     height: '100%',
     backgroundColor: Colors.white,
     borderRadius: 2,
+    width: '100%',
   },
 });
 

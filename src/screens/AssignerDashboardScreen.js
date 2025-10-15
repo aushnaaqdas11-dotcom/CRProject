@@ -9,10 +9,14 @@ import {
   TextInput,
   ScrollView,
   Dimensions,
+  StatusBar,
 } from 'react-native';
 import { useAuth } from '../context/AuthContext';
 import { useNavigation } from '@react-navigation/native';
 import * as Animatable from 'react-native-animatable';
+import LinearGradient from 'react-native-linear-gradient';
+import Icon from 'react-native-vector-icons/FontAwesome';
+import { Colors } from '../styles/theme';
 
 const { width } = Dimensions.get('window');
 
@@ -81,27 +85,36 @@ const AssignerDashboardScreen = () => {
     fetchRequests();
   };
 
-  const renderRequest = ({ item }) => (
-    <Animatable.View animation="fadeInUp" duration={600} style={styles.requestCard}>
-      <View style={styles.requestHeader}>
-        <Text style={styles.projectName}>{item.project?.name || 'N/A'}</Text>
-        <Text style={styles.userName}>{item.user?.name || 'N/A'}</Text>
-      </View>
-      <Text style={styles.issue}>{item.request_details}</Text>
-      <View style={styles.badgesRow}>
-        <Text style={[styles.statusBadge, statusColors[item.status?.toLowerCase()]]}>
-          {item.status}
-        </Text>
-        <Text style={[styles.priorityBadge, priorityColors[item.priority?.toLowerCase()]]}>
-          {item.priority}
-        </Text>
-      </View>
-      <TouchableOpacity
-        style={styles.viewBtn}
-        onPress={() => navigation.navigate('RequestDetail', { requestId: item.id })}
-      >
-        <Text style={{ color: 'white' }}>View</Text>
-      </TouchableOpacity>
+  const renderRequest = ({ item, index }) => (
+    <Animatable.View 
+      animation="fadeInUp" 
+      duration={600} 
+      delay={index * 100}
+      style={styles.requestCard}
+    >
+      <LinearGradient colors={['#ffffff', '#f8f9fa', '#ffffff']} style={styles.cardGradient}>
+        <View style={styles.requestHeader}>
+          <Text style={styles.projectName}>{item.project?.name || 'N/A'}</Text>
+          <Text style={styles.userName}>{item.user?.name || 'N/A'}</Text>
+        </View>
+        <Text style={styles.issue}>{item.request_details}</Text>
+        <View style={styles.badgesRow}>
+          <Text style={[styles.statusBadge, statusColors[item.status?.toLowerCase()]]}>
+            {item.status}
+          </Text>
+          <Text style={[styles.priorityBadge, priorityColors[item.priority?.toLowerCase()]]}>
+            {item.priority}
+          </Text>
+        </View>
+        <TouchableOpacity
+          style={styles.viewBtn}
+          onPress={() => navigation.navigate('RequestDetail', { requestId: item.id })}
+        >
+          <LinearGradient colors={[Colors.primary, Colors.secondary]} style={styles.viewBtnGradient}>
+            <Text style={styles.viewBtnText}>View</Text>
+          </LinearGradient>
+        </TouchableOpacity>
+      </LinearGradient>
     </Animatable.View>
   );
 
@@ -115,113 +128,142 @@ const AssignerDashboardScreen = () => {
         }
       </Text>
       <TouchableOpacity style={styles.refreshButton} onPress={fetchRequests}>
-        <Text style={styles.refreshButtonText}>Refresh</Text>
+        <LinearGradient colors={[Colors.primary, Colors.secondary]} style={styles.refreshButtonGradient}>
+          <Text style={styles.refreshButtonText}>Refresh</Text>
+        </LinearGradient>
       </TouchableOpacity>
     </Animatable.View>
   );
 
   return (
-    <Animatable.View animation="fadeIn" style={styles.container}>
-      {error && (
-        <View style={styles.errorContainer}>
-          <Text style={styles.errorText}>{error}</Text>
-          <TouchableOpacity style={styles.retryButton} onPress={retryFetch}>
-            <Text style={styles.retryText}>Retry</Text>
+    <View style={styles.container}>
+      <StatusBar barStyle="light-content" translucent backgroundColor="transparent" />
+      
+      {/* Navbar */}
+      <View style={styles.navbar}>
+        <View style={styles.navbarContent}>
+          <LinearGradient colors={[Colors.primary, Colors.secondary]} style={styles.logoContainer}>
+            <Text style={styles.navbarTitle}>Assignment Dashboard</Text>
+          </LinearGradient>
+          <TouchableOpacity style={styles.logoutBtn} onPress={handleLogout}>
+            <LinearGradient colors={['#EF4444', '#DC2626']} style={styles.logoutBtnGradient}>
+              <Text style={styles.logoutBtnText}>Logout</Text>
+            </LinearGradient>
           </TouchableOpacity>
         </View>
-      )}
-      
-      {/* Header */}
-      <View style={styles.header}>
-        <Text style={styles.headerTitle}>Assignment Dashboard</Text>
-        <TouchableOpacity style={styles.logoutBtn} onPress={handleLogout}>
-          <Text style={{ color: 'white' }}>Logout</Text>
-        </TouchableOpacity>
       </View>
 
-      {/* Stats Section - Flexible Design */}
-      <View style={styles.statsContainer}>
-        <ScrollView 
-          horizontal 
-          showsHorizontalScrollIndicator={false} 
-          contentContainerStyle={styles.statsScrollContent}
-        >
-          {Object.entries(stats).map(([key, value]) => (
-            <View key={key} style={styles.statCard}>
-              <Text style={[styles.statValue, { color: statColors[key] }]}>
-                {value}
-              </Text>
-              <Text style={styles.statLabel}>
-                {key === 'total' ? 'Total' : 
-                 key === 'pending' ? 'Pending' : 
-                 key === 'inProgress' ? 'In Progress' : 'Completed'}
-              </Text>
-            </View>
-          ))}
-        </ScrollView>
-      </View>
-
-      {/* Search and Filter Section */}
-      <View style={styles.searchFilterContainer}>
-        <TextInput
-          placeholder="Search requests..."
-          value={search}
-          onChangeText={setSearch}
-          style={styles.searchInput}
-          placeholderTextColor="#666"
-        />
-        
-        <ScrollView 
-          horizontal 
-          showsHorizontalScrollIndicator={false}
-          style={styles.filterScroll}
-        >
-          <View style={styles.filterContainer}>
-            {['all', 'pending', 'inprogress', 'completed'].map(f => (
-              <TouchableOpacity
-                key={f}
-                onPress={() => setFilter(f)}
-                style={[
-                  styles.filterBtn, 
-                  filter === f && styles.filterBtnActive
-                ]}
-              >
-                <Text style={[
-                  styles.filterText,
-                  filter === f && styles.filterTextActive
-                ]}>
-                  {f === 'all' ? 'All' : 
-                   f === 'inprogress' ? 'In Progress' : 
-                   f.charAt(0).toUpperCase() + f.slice(1)}
-                </Text>
+      {/* Main Content */}
+      <LinearGradient colors={[Colors.dark, Colors.primary, Colors.dark]} style={styles.background}>
+        <ScrollView contentContainerStyle={styles.scrollContent}>
+          {error && (
+            <Animatable.View animation="fadeIn" style={styles.errorContainer}>
+              <Text style={styles.errorText}>{error}</Text>
+              <TouchableOpacity style={styles.retryButton} onPress={retryFetch}>
+                <LinearGradient colors={[Colors.primary, Colors.secondary]} style={styles.retryButtonGradient}>
+                  <Text style={styles.retryText}>Retry</Text>
+                </LinearGradient>
               </TouchableOpacity>
-            ))}
+            </Animatable.View>
+          )}
+          
+          {/* Stats Section */}
+          <Animatable.View animation="fadeInDown" duration={800} style={styles.statsContainer}>
+            <ScrollView 
+              horizontal 
+              showsHorizontalScrollIndicator={false} 
+              contentContainerStyle={styles.statsScrollContent}
+            >
+              {Object.entries(stats).map(([key, value]) => (
+                <Animatable.View 
+                  key={key} 
+                  animation="zoomIn" 
+                  duration={600}
+                  delay={key === 'total' ? 200 : key === 'pending' ? 300 : key === 'inProgress' ? 400 : 500}
+                  style={styles.statCard}
+                >
+                  <LinearGradient colors={['#ffffff', '#f8f9fa', '#ffffff']} style={styles.statCardGradient}>
+                    <Text style={[styles.statValue, { color: statColors[key] }]}>
+                      {value}
+                    </Text>
+                    <Text style={styles.statLabel}>
+                      {key === 'total' ? 'Total Requests' : 
+                       key === 'pending' ? 'Pending' : 
+                       key === 'inProgress' ? 'In Progress' : 'Completed'}
+                    </Text>
+                  </LinearGradient>
+                </Animatable.View>
+              ))}
+            </ScrollView>
+          </Animatable.View>
+
+          {/* Search and Filter Section */}
+          <Animatable.View animation="fadeInUp" duration={800} delay={200} style={styles.searchFilterContainer}>
+            <View style={styles.searchWrapper}>
+              <Icon name="search" size={16} color={Colors.secondary} style={styles.searchIcon} />
+              <TextInput
+                placeholder="Search requests..."
+                value={search}
+                onChangeText={setSearch}
+                style={styles.searchInput}
+                placeholderTextColor="#666"
+              />
+            </View>
+            
+            <ScrollView 
+              horizontal 
+              showsHorizontalScrollIndicator={false}
+              style={styles.filterScroll}
+            >
+              <View style={styles.filterContainer}>
+                {['all', 'pending', 'inprogress', 'completed'].map(f => (
+                  <TouchableOpacity
+                    key={f}
+                    onPress={() => setFilter(f)}
+                    style={[
+                      styles.filterBtn, 
+                      filter === f && styles.filterBtnActive
+                    ]}
+                  >
+                    <Text style={[
+                      styles.filterText,
+                      filter === f && styles.filterTextActive
+                    ]}>
+                      {f === 'all' ? 'All Requests' : 
+                       f === 'inprogress' ? 'In Progress' : 
+                       f.charAt(0).toUpperCase() + f.slice(1)}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </ScrollView>
+          </Animatable.View>
+
+          {/* Content Area */}
+          <View style={styles.contentContainer}>
+            {loading ? (
+              <View style={styles.loadingContainer}>
+                <ActivityIndicator size="large" color={Colors.accent} />
+                <Text style={styles.loadingText}>Loading requests...</Text>
+              </View>
+            ) : (
+              <FlatList
+                data={filteredRequests}
+                keyExtractor={item => item.id.toString()}
+                renderItem={renderRequest}
+                ListEmptyComponent={EmptyState}
+                contentContainerStyle={[
+                  styles.listContent,
+                  filteredRequests.length === 0 && styles.emptyListContent
+                ]}
+                scrollEnabled={false}
+                showsVerticalScrollIndicator={false}
+              />
+            )}
           </View>
         </ScrollView>
-      </View>
-
-      {/* Content Area */}
-      <View style={styles.contentContainer}>
-        {loading ? (
-          <View style={styles.loadingContainer}>
-            <ActivityIndicator size="large" color="#4ECDC4" />
-            <Text style={styles.loadingText}>Loading requests...</Text>
-          </View>
-        ) : (
-          <FlatList
-            data={filteredRequests}
-            keyExtractor={item => item.id.toString()}
-            renderItem={renderRequest}
-            ListEmptyComponent={EmptyState}
-            contentContainerStyle={[
-              styles.listContent,
-              filteredRequests.length === 0 && styles.emptyListContent
-            ]}
-            showsVerticalScrollIndicator={false}
-          />
-        )}
-      </View>
-    </Animatable.View>
+      </LinearGradient>
+    </View>
   );
 };
 
@@ -246,35 +288,62 @@ const priorityColors = {
 
 const styles = StyleSheet.create({
   container: { 
-    flex: 1, 
-    backgroundColor: '#F8FAFC', 
-    paddingHorizontal: 16,
-    paddingTop: 10,
-  },
-  header: { 
-    flexDirection: 'row', 
-    justifyContent: 'space-between', 
-    alignItems: 'center', 
-    marginBottom: 20,
-    paddingHorizontal: 8,
-  },
-  headerTitle: { 
-    fontSize: 28, 
-    fontWeight: '700', 
-    color: '#1F2937',
-    textAlign: 'center',
     flex: 1,
   },
-  logoutBtn: { 
-    backgroundColor: '#EF4444', 
-    paddingHorizontal: 16,
-    paddingVertical: 10, 
-    borderRadius: 12,
-    minWidth: 80,
-    alignItems: 'center',
+  background: { 
+    flex: 1,
+  },
+  scrollContent: {
+    flexGrow: 1,
+    padding: 16,
   },
   
-  // Stats Section - Flexible Design
+  // Navbar Styles
+  navbar: {
+    backgroundColor: Colors.white, 
+    borderBottomWidth: 1, 
+    borderBottomColor: '#e0e0e0', 
+    paddingHorizontal: 16,
+    paddingTop: 50,
+    paddingBottom: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 3,
+    elevation: 3,
+  },
+  navbarContent: {
+    flexDirection: 'row', 
+    justifyContent: 'space-between', 
+    alignItems: 'center',
+  },
+  logoContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    borderRadius: 8,
+  },
+  navbarTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: 'white',
+  },
+  logoutBtn: {
+    borderRadius: 8,
+    overflow: 'hidden',
+  },
+  logoutBtnGradient: {
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    alignItems: 'center',
+  },
+  logoutBtnText: {
+    color: 'white',
+    fontWeight: '600',
+  },
+  
+  // Stats Section
   statsContainer: {
     marginBottom: 20,
   },
@@ -283,26 +352,25 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   statCard: {
-    backgroundColor: 'white',
-    paddingVertical: 20,
-    paddingHorizontal: 24,
     borderRadius: 16,
+    overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.1,
+    shadowRadius: 20,
+    elevation: 10,
+    minWidth: width * 0.4,
+  },
+  statCardGradient: {
+    paddingVertical: 25,
+    paddingHorizontal: 20,
     alignItems: 'center',
     justifyContent: 'center',
-    minWidth: width * 0.4, // Flexible width based on screen
-    maxWidth: width * 0.45,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 4,
-    borderWidth: 1,
-    borderColor: '#F1F5F9',
   },
   statValue: { 
     fontSize: 32, 
     fontWeight: '700', 
-    marginBottom: 4,
+    marginBottom: 8,
   },
   statLabel: { 
     fontSize: 14, 
@@ -315,19 +383,29 @@ const styles = StyleSheet.create({
   searchFilterContainer: {
     marginBottom: 20,
   },
-  searchInput: { 
-    backgroundColor: 'white', 
-    padding: 16,
+  searchWrapper: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#ffffff',
     borderRadius: 12,
-    fontSize: 16,
-    marginBottom: 12,
+    paddingHorizontal: 15,
+    marginBottom: 16,
     borderWidth: 1,
-    borderColor: '#E2E8F0',
+    borderColor: '#ddd',
+    height: 50,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 4,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 3,
     elevation: 2,
+  },
+  searchIcon: {
+    marginRight: 10,
+  },
+  searchInput: {
+    flex: 1,
+    color: '#333',
+    fontSize: 16,
   },
   filterScroll: {
     marginBottom: 8,
@@ -344,7 +422,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#E2E8F0',
     backgroundColor: 'white',
-    minWidth: 100,
+    minWidth: 110,
     alignItems: 'center',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 1 },
@@ -353,8 +431,8 @@ const styles = StyleSheet.create({
     elevation: 2,
   },
   filterBtnActive: { 
-    backgroundColor: '#4ECDC4', 
-    borderColor: '#4ECDC4',
+    backgroundColor: Colors.primary, 
+    borderColor: Colors.primary,
   },
   filterText: {
     fontSize: 14,
@@ -378,7 +456,7 @@ const styles = StyleSheet.create({
   loadingText: {
     marginTop: 12,
     fontSize: 16,
-    color: '#64748B',
+    color: Colors.accent,
   },
   listContent: {
     paddingBottom: 20,
@@ -389,29 +467,29 @@ const styles = StyleSheet.create({
   },
   
   // Request Cards
-  requestCard: { 
-    backgroundColor: 'white', 
-    padding: 20, 
-    borderRadius: 16, 
-    marginBottom: 12, 
+  requestCard: {
+    borderRadius: 16,
+    overflow: 'hidden',
+    marginBottom: 16,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
+    shadowOffset: { width: 0, height: 10 },
     shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 4,
-    borderWidth: 1,
-    borderColor: '#F1F5F9',
+    shadowRadius: 20,
+    elevation: 10,
+  },
+  cardGradient: {
+    padding: 20,
   },
   requestHeader: { 
     flexDirection: 'row', 
     justifyContent: 'space-between', 
-    marginBottom: 8,
+    marginBottom: 12,
     flexWrap: 'wrap',
   },
   projectName: { 
     fontSize: 18, 
     fontWeight: '700',
-    color: '#1F2937',
+    color: '#2a5298',
     flex: 1,
   },
   userName: { 
@@ -428,7 +506,7 @@ const styles = StyleSheet.create({
   badgesRow: { 
     flexDirection: 'row', 
     gap: 8, 
-    marginBottom: 12,
+    marginBottom: 16,
     flexWrap: 'wrap',
   },
   statusBadge: { 
@@ -449,16 +527,23 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#E2E8F0',
   },
-  viewBtn: { 
-    backgroundColor: '#4ECDC4', 
+  viewBtn: {
+    borderRadius: 12,
+    overflow: 'hidden',
+    shadowColor: Colors.primary,
+    shadowOffset: { width: 0, height: 5 },
+    shadowOpacity: 0.3,
+    shadowRadius: 10,
+    elevation: 5,
+  },
+  viewBtnGradient: {
     padding: 12,
-    borderRadius: 12, 
     alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
+  },
+  viewBtnText: {
+    color: Colors.accent,
+    fontSize: 16,
+    fontWeight: '600',
   },
   
   // Empty State
@@ -471,36 +556,48 @@ const styles = StyleSheet.create({
   emptyStateTitle: {
     fontSize: 20,
     fontWeight: '700',
-    color: '#1F2937',
+    color: '#2a5298',
     marginBottom: 8,
     textAlign: 'center',
   },
   emptyStateText: {
     fontSize: 16,
-    color: '#6B7280',
+    color: '#666',
     textAlign: 'center',
     lineHeight: 24,
     marginBottom: 20,
   },
   refreshButton: {
-    backgroundColor: '#4ECDC4',
+    borderRadius: 12,
+    overflow: 'hidden',
+    shadowColor: Colors.primary,
+    shadowOffset: { width: 0, height: 5 },
+    shadowOpacity: 0.3,
+    shadowRadius: 10,
+    elevation: 5,
+  },
+  refreshButtonGradient: {
     paddingHorizontal: 24,
     paddingVertical: 12,
-    borderRadius: 12,
+    alignItems: 'center',
   },
   refreshButtonText: {
-    color: 'white',
+    color: Colors.accent,
     fontWeight: '600',
     fontSize: 16,
   },
   
   // Error State
   errorContainer: { 
-    padding: 16, 
-    alignItems: 'center',
-    backgroundColor: '#FEF2F2',
+    backgroundColor: '#ffffff',
     borderRadius: 12,
+    padding: 20,
     marginBottom: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 4,
     borderWidth: 1,
     borderColor: '#FECACA',
   },
@@ -508,16 +605,19 @@ const styles = StyleSheet.create({
     color: '#DC2626', 
     fontSize: 16,
     textAlign: 'center',
-    marginBottom: 12,
+    marginBottom: 16,
   },
-  retryButton: { 
-    backgroundColor: '#DC2626', 
-    paddingHorizontal: 20,
-    paddingVertical: 10, 
+  retryButton: {
     borderRadius: 8,
+    overflow: 'hidden',
+  },
+  retryButtonGradient: {
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    alignItems: 'center',
   },
   retryText: { 
-    color: 'white', 
+    color: Colors.accent, 
     fontWeight: '600',
   },
 });

@@ -51,66 +51,64 @@ const LoginScreen = ({ navigation }) => {
     ]).start();
   };
 
-const handleLogin = async () => {
-  if (!login || !password) {
-    Alert.alert('Error', 'Please enter both login and password');
-    shake();
-    return;
-  }
-
-  if (userCaptcha.toLowerCase() !== captchaText.toLowerCase()) {
-    Alert.alert('Error', 'Please enter the correct CAPTCHA');
-    shake();
-    generateCaptcha();
-    return;
-  }
-
-  setIsLoading(true);
-
-  try {
-    const result = await authLogin(login, password);
-    console.log("Login result:", result);
-
-    if (result.success) {
-      const role = parseInt(result.user?.role); // <-- ensure number
-      console.log("User role:", role);
-
-      const dashboards = {
-        1: "AdminDashboard",
-        2: "UserDashboard",
-        3: "ResolverDashboard",
-        4: "AssignerDashboard"
-      };
-
-      const targetScreen = dashboards[role];
-
-      if (!targetScreen) {
-        Alert.alert("Navigation Error", "Dashboard not found for your role");
-        generateCaptcha();
-        return;
-      }
-
-      // Navigate to dashboard
-      navigation.reset({
-        index: 0,
-        routes: [{ name: targetScreen }],
-      });
-
-    } else {
-      const firstError = Object.values(result.errors || {})[0]?.[0] || result.message;
-      Alert.alert('Login Failed', firstError);
-      generateCaptcha();
+  const handleLogin = async () => {
+    if (!login || !password) {
+      Alert.alert('Error', 'Please enter both login and password');
+      shake();
+      return;
     }
 
-  } catch (err) {
-    console.error("Login exception:", err);
-    Alert.alert('Login Failed', 'Something went wrong. Please try again.');
-    generateCaptcha();
-  } finally {
-    setIsLoading(false);
-  }
-};
+    if (userCaptcha.toLowerCase() !== captchaText.toLowerCase()) {
+      Alert.alert('Error', 'Please enter the correct CAPTCHA');
+      shake();
+      generateCaptcha();
+      return;
+    }
 
+    setIsLoading(true);
+
+    try {
+      const result = await authLogin(login, password);
+      console.log("Login result:", result);
+
+      if (result.success) {
+        const role = parseInt(result.user?.role);
+        console.log("User role:", role);
+
+        const dashboards = {
+          1: "AdminDashboard",
+          2: "UserDashboard",
+          3: "ResolverDashboard",
+          4: "AssignerDashboard"
+        };
+
+        const targetScreen = dashboards[role];
+
+        if (!targetScreen) {
+          Alert.alert("Navigation Error", "Dashboard not found for your role");
+          generateCaptcha();
+          return;
+        }
+
+        navigation.reset({
+          index: 0,
+          routes: [{ name: targetScreen }],
+        });
+
+      } else {
+        const firstError = Object.values(result.errors || {})[0]?.[0] || result.message;
+        Alert.alert('Login Failed', firstError);
+        generateCaptcha();
+      }
+
+    } catch (err) {
+      console.error("Login exception:", err);
+      Alert.alert('Login Failed', 'Something went wrong. Please try again.');
+      generateCaptcha();
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   useEffect(() => { generateCaptcha(); }, []);
 
@@ -150,13 +148,48 @@ const handleLogin = async () => {
     >
       <StatusBar barStyle="light-content" translucent backgroundColor="transparent" />
 
-      {/* Navbar */}
+      {/* Navbar - Same as WelcomeScreen */}
       <View style={styles.navbar}>
         <View style={styles.navbarContent}>
-          <LinearGradient colors={[Colors.primary, Colors.secondary]} style={styles.logoContainer}>
-            <Image source={require('../assets/images/crp.png')} style={styles.logo} resizeMode="contain" />
-            <Text style={styles.navbarTitle}>Change Request Portal</Text>
-          </LinearGradient>
+          {/* Logo Section - Same as WelcomeScreen */}
+          <TouchableOpacity style={styles.logoContainer}>
+            <LinearGradient colors={[Colors.primary, Colors.secondary]} style={styles.logoGradient}>
+              <View style={styles.logosWrapper}>
+                <Image 
+                  source={require('../assets/images/PITBLOGO.png')} 
+                  style={styles.pitbLogo} 
+                  resizeMode="contain" 
+                />
+                <Image 
+                  source={require('../assets/images/crp.png')} 
+                  style={styles.crpLogo} 
+                  resizeMode="contain" 
+                />
+              </View>
+            </LinearGradient>
+          </TouchableOpacity>
+
+          {/* Navigation Links - Same as WelcomeScreen */}
+          <View style={styles.navLinks}>
+            <TouchableOpacity onPress={() => navigation.navigate('Welcome', { scrollTo: 'services' })} style={styles.navButton}>
+              <Text style={styles.navButtonText}>Services</Text>
+            </TouchableOpacity>
+            
+            <TouchableOpacity onPress={() => navigation.navigate('Welcome', { scrollTo: 'projects' })} style={styles.navButton}>
+              <Text style={styles.navButtonText}>Projects</Text>
+            </TouchableOpacity>
+            
+            <TouchableOpacity>
+              <LinearGradient
+                colors={[Colors.primary, Colors.secondary]}
+                style={styles.signInButton}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+              >
+                <Text style={styles.signInButtonText}>Sign In</Text>
+              </LinearGradient>
+            </TouchableOpacity>
+          </View>
         </View>
       </View>
 
@@ -240,6 +273,20 @@ const handleLogin = async () => {
             </Animated.View>
           </View>
         </ScrollView>
+
+        {/* Footer - Same as WelcomeScreen */}
+        <View style={styles.footer}>
+          <View style={styles.footerContent}>
+            <View style={styles.footerLogoContainer}>
+              <Image 
+                source={require('../assets/images/PITBLOGO.png')} 
+                style={styles.footerLogo} 
+                resizeMode="contain" 
+              />
+              <Text style={styles.footerText}>A project of Government of the Punjab</Text>
+            </View>
+          </View>
+        </View>
       </LinearGradient>
     </KeyboardAvoidingView>
   );
@@ -249,54 +296,74 @@ const styles = StyleSheet.create({
   container: { flex: 1 },
   background: { flex: 1 },
   
-  // Navbar Styles - Exactly as you specified
-  navbar: {
-   backgroundColor: Colors.white, 
+  // Navbar Styles - Same as WelcomeScreen
+  navbar: { 
+    backgroundColor: Colors.white, 
     borderBottomWidth: 1, 
     borderBottomColor: '#e0e0e0', 
     paddingHorizontal: 16,
     paddingTop: 50,
-    paddingBottom: 9,
+    paddingBottom: 10,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 3,
     elevation: 3,
   },
-  navbarContent: {
-     flexDirection: 'row', 
+  navbarContent: { 
+    flexDirection: 'row', 
     justifyContent: 'space-between', 
     alignItems: 'center',
   },
   logoContainer: {
+    borderRadius: 8,
+    overflow: 'hidden',
+  },
+  logoGradient: {
+    paddingHorizontal: 15,
+    paddingVertical: 5,
+  },
+  logosWrapper: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 15,
-    paddingVertical: 8,
-    borderRadius: 8,
+    justifyContent: 'center',
   },
-  logo: {
-    width: 40,
-    height: 30,
+  pitbLogo: {
+    width: 35,
+    height: 35,
     marginRight: 10,
   },
-  navbarTitle: {
-   fontSize: 10,
-    fontWeight: 'bold',
-    color: 'white',
+  crpLogo: {
+    width: 45,
+    height: 35,
+  },
+  navLinks: { 
+    flexDirection: 'row', 
+    alignItems: 'center',
+  },
+  navButton: { 
+    paddingHorizontal: 9,
+    paddingVertical: 6,
+    marginLeft: 8,
+  },
+  navButtonText: { 
+    fontSize: 14, 
+    fontWeight: '600', 
+    color: Colors.primary,
   },
   signInButton: {
-    paddingHorizontal: 20,
-    paddingVertical: 10,
-    borderRadius: 8,
+    borderRadius: 6,
+    paddingHorizontal: 13,
+    paddingVertical: 8,
+    marginLeft: 12,
   },
   signInButtonText: {
-    color: Colors.accent,
     fontSize: 14,
-    fontWeight: 'bold',
+    fontWeight: '600',
+    color: Colors.white,
   },
 
-  // Your existing styles remain exactly the same
+  // Main Content Styles (unchanged)
   scrollContent: {
     flexGrow: 1,
     justifyContent: 'center',
@@ -320,26 +387,6 @@ const styles = StyleSheet.create({
   },
   cardGradient: {
     padding: 30,
-  },
-  logoContainerCard: { 
-    alignItems: 'center', 
-    marginBottom: 20 
-  },
-   loginCardLogo: {
-    width: 40,
-    height: 40,
-  },
-  logoCircleCard: {
-    width: 70,
-    height: 70,
-    borderRadius: 35,
-    justifyContent: 'center',
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 5 },
-    shadowOpacity: 0.2,
-    shadowRadius: 10,
-    elevation: 5,
   },
   header: { 
     alignItems: 'center', 
@@ -373,10 +420,6 @@ const styles = StyleSheet.create({
     shadowRadius: 3,
     elevation: 2,
   },
-  inputError: {
-    borderColor: '#ff4757',
-    borderWidth: 1,
-  },
   input: { 
     flex: 1, 
     color: '#333',
@@ -384,31 +427,6 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
   },
   inputIcon: { marginRight: 10 },
-  strengthContainer: {
-    marginBottom: 16,
-  },
-  strengthBar: {
-    height: 6,
-    backgroundColor: '#f1f1f1',
-    borderRadius: 3,
-    overflow: 'hidden',
-    marginBottom: 5,
-  },
-  strengthFill: {
-    height: '100%',
-    borderRadius: 3,
-  },
-  strengthText: {
-    fontSize: 12,
-    fontWeight: '500',
-  },
-  errorText: {
-    color: '#ff4757',
-    fontSize: 12,
-    marginTop: -10,
-    marginBottom: 16,
-    marginLeft: 10,
-  },
   captchaContainer: {
     marginBottom: 20,
     backgroundColor: '#f8f9fa',
@@ -442,13 +460,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  captchaChar: {
-    fontSize: 32,
-    fontWeight: 'bold',
-    color: '#2a5298',
-    marginHorizontal: 2,
-    fontFamily: 'monospace',
   },
   captchaInstruction: {
     fontSize: 14,
@@ -485,15 +496,6 @@ const styles = StyleSheet.create({
     fontWeight: '500',
     marginLeft: 5,
   },
-  forgotPassword: { 
-    alignSelf: 'flex-end', 
-    marginBottom: 25,
-  },
-  forgotPasswordText: { 
-    color: Colors.secondary, 
-    fontSize: 14,
-    fontWeight: '500',
-  },
   loginButton: { 
     height: 56, 
     borderRadius: 12, 
@@ -518,38 +520,32 @@ const styles = StyleSheet.create({
     fontSize: 18, 
     fontWeight: '600' 
   },
-  cardFooterText: {
-    color: '#666',
-    fontSize: 12,
-    textAlign: 'center',
-    lineHeight: 16,
-  },
-  link: { 
-    color: Colors.secondary, 
-    fontWeight: '500' 
-  },
 
-  // Footer Styles - Exactly as you specified
+  // Footer Styles - Same as WelcomeScreen
   footer: {
-    height: 60,
-    justifyContent: 'center',
-    alignItems: 'center',
+    backgroundColor: Colors.white,
+    borderTopWidth: 1,
+    borderTopColor: '#E5E7EB',
+    paddingVertical: 16,
   },
   footerContent: {
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  footerLogoContainer: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
+    gap: 12,
   },
   footerLogo: {
-    width: 50, // Adjust size as needed
-    height: 24,
-    tintColor: Colors.white,
-    marginRight: 12, // Space between logo and text
+    width: 25,
+    height: 25,
   },
   footerText: {
-    color: Colors.accent,
+    color: '#374151',
     fontSize: 14,
-    fontWeight: '500',
+    fontWeight: '600',
   },
 });
 

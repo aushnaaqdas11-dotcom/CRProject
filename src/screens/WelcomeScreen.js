@@ -31,7 +31,7 @@ const WelcomeScreen = ({ navigation, route }) => {
   });
 
   useEffect(() => {
-    // Start animations (removed width animation)
+    // Start animations
     Animated.parallel([
       Animated.timing(fadeAnim, {
         toValue: 1,
@@ -136,9 +136,9 @@ const WelcomeScreen = ({ navigation, route }) => {
 
   // Stats Data
   const stats = [
-{ number: '500+', label: 'Projects Managed', icon: 'shield' },
-{ number: '200+', label: 'Happy Clients', icon: 'users' },
-{ number: '98%', label: 'Satisfaction Rate', icon: 'line-chart' }
+    { number: '500+', label: 'Projects Managed', icon: 'shield' },
+    { number: '200+', label: 'Happy Clients', icon: 'users' },
+    { number: '98%', label: 'Satisfaction Rate', icon: 'line-chart' }
   ];
 
   // Services Data
@@ -195,24 +195,26 @@ const WelcomeScreen = ({ navigation, route }) => {
     <SafeAreaView style={styles.container}>
       <StatusBar barStyle="light-content" translucent backgroundColor="transparent" />
       
-      {/* Fixed Navbar - Proper Mobile App Design */}
+      {/* Fixed Navbar - Same as Login Screen */}
       <View style={styles.navbar}>
         <View style={styles.navbarContent}>
-          {/* Logo Section */}
-        {/* Logo Container with Gradient */}
-<LinearGradient
-  colors={[Colors.primary, Colors.secondary]}
-  style={styles.logoContainer}
-  start={{ x: 0, y: 0 }}
-  end={{ x: 1, y: 1 }}
->
-  <Image 
-    source={require('../assets/images/crp.png')}
-    style={styles.logo}
-    resizeMode="contain"
-  />
-  <Text style={styles.navbarTitle}>Change Request Portal</Text>
-</LinearGradient>
+          {/* Logo Section - Same as Login Screen */}
+          <TouchableOpacity style={styles.logoContainer}>
+            <LinearGradient colors={[Colors.primary, Colors.secondary]} style={styles.logoGradient}>
+              <View style={styles.logosWrapper}>
+                <Image 
+                  source={require('../assets/images/PITBLOGO.png')} 
+                  style={styles.pitbLogo} 
+                  resizeMode="contain" 
+                />
+                <Image 
+                  source={require('../assets/images/crp.png')} 
+                  style={styles.crpLogo} 
+                  resizeMode="contain" 
+                />
+              </View>
+            </LinearGradient>
+          </TouchableOpacity>
 
           {/* Navigation Links */}
           <View style={styles.navLinks}>
@@ -223,17 +225,17 @@ const WelcomeScreen = ({ navigation, route }) => {
             <TouchableOpacity onPress={handleProjectsPress} style={styles.navButton}>
               <Text style={styles.navButtonText}>Projects</Text>
             </TouchableOpacity>
+            
             <TouchableOpacity onPress={handleSignInPress}>
-  <LinearGradient
-    colors={[Colors.primary, Colors.secondary]}
-    style={styles.signInButton}
-    start={{ x: 0, y: 0 }}
-    end={{ x: 1, y: 1 }}
-  >
-    <Text style={styles.signInButtonText}>Sign In</Text>
-  </LinearGradient>
-</TouchableOpacity>
-
+              <LinearGradient
+                colors={[Colors.primary, Colors.secondary]}
+                style={styles.signInButton}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+              >
+                <Text style={styles.signInButtonText}>Sign In</Text>
+              </LinearGradient>
+            </TouchableOpacity>
           </View>
         </View>
       </View>
@@ -246,44 +248,45 @@ const WelcomeScreen = ({ navigation, route }) => {
       >
         {/* Hero Section */}
         <LinearGradient
-  colors={[Colors.primary, Colors.secondary]}
-  style={styles.heroSection}
-  start={{ x: 0, y: 0 }}
-  end={{ x: 1, y: 1 }}
->
-  {/* Background Image */}
-  <Image 
-    source={require('../assets/images/banner.jpg')}
-    style={styles.heroBackgroundImage}
-    resizeMode="cover"
-  />
-  
-  <Animated.View style={[styles.heroContent, { opacity: fadeAnim, transform: [{ translateY: slideUpAnim }] }]}>
-    <Text style={styles.heroTitle}>
-      Streamline Your{'\n'}
-      <Text style={styles.heroTitleHighlight}>Project Changes</Text>
-    </Text>
-    
-    <Text style={styles.heroSubtitle}>
-      Transform your workflow with our cutting-edge platform designed for seamless project change management.
-    </Text>
-    
-    <TouchableOpacity style={styles.heroButton} onPress={() => navigation.navigate('Login')}>
-      <LinearGradient
-        colors={[Colors.primary, Colors.secondary, Colors.primary]}
-        style={styles.heroButtonGradient}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 0 }}
-      >
-        <Icon name="rocket" size={20} color={Colors.white} />
-        <Text style={styles.heroButtonText}>Request a Change</Text>
-      </LinearGradient>
-    </TouchableOpacity>
-  </Animated.View>
+          colors={[Colors.primary, Colors.secondary]}
+          style={styles.heroSection}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+        >
+          {/* Background Image */}
+          <Image 
+            source={require('../assets/images/banner.jpg')}
+            style={styles.heroBackgroundImage}
+            resizeMode="cover"
+          />
+          
+          <Animated.View style={[styles.heroContent, { opacity: fadeAnim, transform: [{ translateY: slideUpAnim }] }]}>
+            <Text style={styles.heroTitle}>
+              Streamline Your{'\n'}
+              <Text style={styles.heroTitleHighlight}>Project Changes</Text>
+            </Text>
+            
+            <Text style={styles.heroSubtitle}>
+              Transform your workflow with our cutting-edge platform designed for seamless project change management.
+            </Text>
+            
+            <TouchableOpacity style={styles.heroButton} onPress={() => navigation.navigate('Login')}>
+              <LinearGradient
+                colors={[Colors.primary, Colors.secondary, Colors.primary]}
+                style={styles.heroButtonGradient}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 0 }}
+              >
+                <Icon name="rocket" size={20} color={Colors.white} />
+                <Text style={styles.heroButtonText}>Request a Change</Text>
+              </LinearGradient>
+            </TouchableOpacity>
+          </Animated.View>
 
-  <Animated.View style={[styles.floatingElement, styles.floating1, { transform: [{ translateY: translateY1 }] }]} />
-  <Animated.View style={[styles.floatingElement, styles.floating2, { transform: [{ translateY: translateY2 }] }]} />
-</LinearGradient>
+          <Animated.View style={[styles.floatingElement, styles.floating1, { transform: [{ translateY: translateY1 }] }]} />
+          <Animated.View style={[styles.floatingElement, styles.floating2, { transform: [{ translateY: translateY2 }] }]} />
+        </LinearGradient>
+
         {/* Stats Section */}
         <View style={styles.statsSection}>
           <View style={styles.statsContainer}>
@@ -385,24 +388,19 @@ const WelcomeScreen = ({ navigation, route }) => {
           </View>
         </LinearGradient>
 
-        {/* Footer */}
-       <LinearGradient
-  colors={[Colors.primary, Colors.secondary]}
-  style={styles.footer}
-  start={{ x: 0, y: 0 }}
-  end={{ x: 1, y: 1 }}
->
-  <View style={styles.footerContent}>
-    <Image 
-      source={require('../assets/images/crp.png')}
-      style={styles.footerLogo}
-      resizeMode="contain"
-    />
-    <Text style={styles.footerText}>
-      A project of Government of the Punjab
-    </Text>
-  </View>
-</LinearGradient>
+        {/* Footer - Same as Login Screen */}
+        <View style={styles.footer}>
+          <View style={styles.footerContent}>
+            <View style={styles.footerLogoContainer}>
+              <Image 
+                source={require('../assets/images/PITBLOGO.png')} 
+                style={styles.footerLogo} 
+                resizeMode="contain" 
+              />
+              <Text style={styles.footerText}>A project of Government of the Punjab</Text>
+            </View>
+          </View>
+        </View>
       </ScrollView>
     </SafeAreaView>
   );
@@ -413,14 +411,14 @@ const styles = StyleSheet.create({
     flex: 1, 
     backgroundColor: Colors.white 
   },
-  // Fixed Navbar Styles
+  // Fixed Navbar Styles - Same as Login Screen
   navbar: { 
     backgroundColor: Colors.white, 
     borderBottomWidth: 1, 
     borderBottomColor: '#e0e0e0', 
     paddingHorizontal: 16,
     paddingTop: 50,
-    paddingBottom: 9,
+    paddingBottom: 10,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
@@ -432,31 +430,27 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between', 
     alignItems: 'center',
   },
-  logoSection: {
+  logoContainer: {
+    borderRadius: 8,
+    overflow: 'hidden',
+  },
+  logoGradient: {
+    paddingHorizontal: 15,
+    paddingVertical: 5,
+  },
+  logosWrapper: {
     flexDirection: 'row',
     alignItems: 'center',
-    flex: 1,
+    justifyContent: 'center',
   },
-  // Updated logoContainer with gradient background
-  logoContainer: { 
-    width: 110, 
-    height: 40, 
-    borderRadius: 8,
-    justifyContent: 'center', 
-    alignItems: 'center',
-    marginRight: 12,
-    padding: 10,
-    // Remove backgroundColor and let gradient handle it
+  pitbLogo: {
+    width: 35,
+    height: 35,
+    marginRight: 10,
   },
-  logo: { 
-    width: 40, 
-    height: 24,
-    tintColor: Colors.white,
-  },
-  navbarTitle: {
-    fontSize: 10,
-    fontWeight: 'bold',
-    color: 'white',
+  crpLogo: {
+    width: 45,
+    height: 35,
   },
   navLinks: { 
     flexDirection: 'row', 
@@ -472,13 +466,11 @@ const styles = StyleSheet.create({
     fontWeight: '600', 
     color: Colors.primary,
   },
-  // Updated signInButton with gradient background
   signInButton: {
     borderRadius: 6,
     paddingHorizontal: 13,
     paddingVertical: 8,
     marginLeft: 12,
-    // Remove backgroundColor and let gradient handle it
   },
   signInButtonText: {
     fontSize: 14,
@@ -491,22 +483,22 @@ const styles = StyleSheet.create({
   scrollContent: {
     flexGrow: 1,
   },
-   heroSection: { 
+  heroSection: { 
     minHeight: height * 0.7, 
     justifyContent: 'center', 
     alignItems: 'center', 
     position: 'relative',
-    overflow: 'hidden', // Important for background image
+    overflow: 'hidden',
   },
-   heroBackgroundImage: {
+  heroBackgroundImage: {
     position: 'absolute',
     width: '100%',
     height: '100%',
-    opacity: 0.1, // Adjust opacity as needed (0.1 to 0.5 usually works well)
+    opacity: 0.1,
   },
   heroContent: { 
     alignItems: 'center', 
-    zIndex: 2, // Ensure content stays above background
+    zIndex: 2,
   },
   heroTitle: { 
     fontSize: 32, 
@@ -738,25 +730,31 @@ const styles = StyleSheet.create({
     color: Colors.secondary, 
     marginRight: 6 
   },
-   footer: { 
-    paddingVertical: 20,
-    paddingHorizontal: 24,
+  // Footer Styles - Same as Login Screen
+  footer: {
+    backgroundColor: Colors.white,
+    borderTopWidth: 1,
+    borderTopColor: '#E5E7EB',
+    paddingVertical: 16,
   },
   footerContent: {
-    flexDirection: 'row', // This puts logo and text in same line
     alignItems: 'center',
-    justifyContent: 'center', // Center the content horizontally
+    justifyContent: 'center',
+  },
+  footerLogoContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 12,
   },
   footerLogo: {
-    width: 50, // Adjust size as needed
-    height: 24,
-    tintColor: Colors.white,
-    marginRight: 12, // Space between logo and text
+    width: 25,
+    height: 25,
   },
   footerText: {
+    color: '#374151',
     fontSize: 14,
-    color: Colors.white,
-    fontWeight: '500',
+    fontWeight: '600',
   },
 });
 
