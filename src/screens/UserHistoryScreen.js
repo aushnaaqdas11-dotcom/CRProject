@@ -105,8 +105,8 @@ const UserHistoryScreen = () => {
 };
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#e6fffa', padding: 10 },
-  historyTitle: { fontSize: 18, marginBottom: 15, color: '#2c3e50', textAlign: 'center' },
+  container: { flex: 1, backgroundColor: '#e6fffa', padding: 10,},
+  historyTitle: { fontSize: 18, marginBottom: 15, color: '#2c3e50', textAlign: 'center', fontWeight:30, marginTop:30},
   requestCard: { borderLeftWidth: 3, borderLeftColor: '#4ecdc4', padding: 12, marginBottom: 12, backgroundColor: '#f8fafc', borderRadius: 6 },
   requestCardHigh: { borderLeftColor: '#ff6b6b' },
   requestCardLow: { borderLeftColor: '#ffd166' },

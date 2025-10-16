@@ -21,7 +21,7 @@ import { Colors } from '../styles/theme';
 const { width } = Dimensions.get('window');
 
 const AssignerDashboardScreen = () => {
-  const { logout, userApi } = useAuth();
+  const { logout, userApi, user } = useAuth();
   const navigation = useNavigation();
 
   const [requests, setRequests] = useState([]);
@@ -142,14 +142,19 @@ const AssignerDashboardScreen = () => {
       {/* Navbar */}
       <View style={styles.navbar}>
         <View style={styles.navbarContent}>
+          {/* Logo Container on Left Side */}
           <LinearGradient colors={[Colors.primary, Colors.secondary]} style={styles.logoContainer}>
             <Text style={styles.navbarTitle}>Assignment Dashboard</Text>
           </LinearGradient>
-          <TouchableOpacity style={styles.logoutBtn} onPress={handleLogout}>
-            <LinearGradient colors={['#EF4444', '#DC2626']} style={styles.logoutBtnGradient}>
-              <Text style={styles.logoutBtnText}>Logout</Text>
-            </LinearGradient>
-          </TouchableOpacity>
+
+          {/* Action Buttons on Right Side */}
+          <View style={styles.actionButtons}>
+             <TouchableOpacity style={styles.logoutBtn} onPress={handleLogout}>
+              <LinearGradient colors={['#EF4444', '#DC2626']} style={styles.logoutBtnGradient}>
+                <Text style={styles.logoutBtnText}>Logout</Text>
+              </LinearGradient>
+            </TouchableOpacity>
+          </View>
         </View>
       </View>
 
@@ -166,6 +171,17 @@ const AssignerDashboardScreen = () => {
               </TouchableOpacity>
             </Animatable.View>
           )}
+
+          {/* Super Admin Section */}
+          <View style={styles.superAdminSection}>
+            <Text style={styles.superAdminTitle}>Assigner Dashboard</Text>
+            <Text style={styles.superAdminEmail}>{user?.email || 'assigner@example.com'}</Text>
+            
+            {/* Logout Button on Left Side */}
+             
+          </View>
+
+          <View style={styles.divider} />
           
           {/* Stats Section */}
           <Animatable.View animation="fadeInDown" duration={800} style={styles.statsContainer}>
@@ -318,29 +334,80 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   logoContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
     paddingHorizontal: 20,
     paddingVertical: 10,
     borderRadius: 8,
   },
   navbarTitle: {
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: 'bold',
     color: 'white',
+  },
+  actionButtons: {
+    flexDirection: 'row',
+    gap: 10,
+  },
+  viewHistoryBtn: {
+    borderRadius: 8,
+    overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 3,
+    elevation: 2,
+  },
+  btnGradient: {
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    alignItems: 'center',
+  },
+  btnText: {
+    color: Colors.accent,
+    fontWeight: '600',
+    fontSize: 14,
+  },
+  
+  // Super Admin Section
+  superAdminSection: {
+    marginBottom: 7,
+    padding: 16,
+  },
+  superAdminTitle: {
+    fontSize: 35,
+    fontWeight: 'bold',
+    color: Colors.accent,
+    marginBottom: 4,
+  },
+  superAdminEmail: {
+    fontSize: 16,
+    color: Colors.accent,
+    opacity: 0.8,
+    marginBottom: 16,
   },
   logoutBtn: {
     borderRadius: 8,
     overflow: 'hidden',
+    alignSelf: 'flex-start',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 3,
+    elevation: 2,
   },
   logoutBtnGradient: {
     paddingHorizontal: 20,
-    paddingVertical: 10,
+    paddingVertical: 12,
     alignItems: 'center',
   },
   logoutBtnText: {
     color: 'white',
     fontWeight: '600',
+    fontSize: 14,
+  },
+  divider: {
+    height: 1,
+    backgroundColor: 'rgba(255, 255, 255, 0.3)',
+    marginBottom: 20,
   },
   
   // Stats Section

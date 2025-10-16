@@ -28,13 +28,30 @@ const UserDashboard = () => {
   const [notification, setNotification] = useState({ message: '', type: '' });
   const intervalRef = useRef(null);
 
+  // New states for subquery
+  const [subQueries, setSubQueries] = useState([]);
+  const [selectedSubQuery, setSelectedSubQuery] = useState('');
+  const [source, setSource] = useState('web');
+  const [loadingSubQueries, setLoadingSubQueries] = useState(false);
+
   useEffect(() => {
     fetchDashboardData();
-    intervalRef.current = setInterval(fetchDashboardData, 60000);
+    // Increased auto-refresh time from 60 seconds to 120 seconds (2 minutes)
+    intervalRef.current = setInterval(fetchDashboardData, 620000);
     return () => clearInterval(intervalRef.current);
   }, []);
 
   useEffect(() => setSelectedProject(''), [targetType]);
+
+  // Fetch subqueries when service is selected
+  useEffect(() => {
+    if (selectedService) {
+      fetchSubQueries(selectedService);
+    } else {
+      setSubQueries([]);
+      setSelectedSubQuery('');
+    }
+  }, [selectedService]);
 
   const fetchDashboardData = async () => {
     setLoading(true);
@@ -63,6 +80,35 @@ const UserDashboard = () => {
     }
   };
 
+  const fetchSubQueries = async (queryId) => {
+    setLoadingSubQueries(true);
+    try {
+      console.log('Fetching subqueries for query:', queryId);
+      const res = await userApi.getSubQueries(queryId);
+      console.log('Subqueries API response:', res.data);
+      
+      if (res.data.success) {
+        const subQueriesData = res.data.sub_queries || [];
+        console.log('Subqueries data received:', subQueriesData);
+        setSubQueries(subQueriesData);
+        
+        if (subQueriesData.length === 0) {
+          console.log('No subqueries found for this service');
+        }
+      } else {
+        console.log('Subqueries API returned success: false');
+        setSubQueries([]);
+      }
+    } catch (err) {
+      console.error('Failed to fetch subqueries:', err);
+      console.error('Error details:', err.response?.data);
+      showNotification('Failed to load subqueries', 'error');
+      setSubQueries([]);
+    } finally {
+      setLoadingSubQueries(false);
+    }
+  };
+
   const showNotification = (message, type = 'success') => {
     setNotification({ message, type });
     setTimeout(() => setNotification({ message: '', type: '' }), 4000);
@@ -70,7 +116,7 @@ const UserDashboard = () => {
 
   const handleSubmit = async () => {
     if (!selectedService || !selectedProject || !requestDetails.trim()) {
-      showNotification('Please fill all fields', 'error');
+      showNotification('Please fill all required fields', 'error');
       return;
     }
 
@@ -79,8 +125,13 @@ const UserDashboard = () => {
         query_id: selectedService,
         project_id: selectedProject,
         priority,
-        request_details: requestDetails
+        request_details: requestDetails,
+        sub_query: selectedSubQuery, // Add sub_query to payload
+        source: source, // Add source to payload
       };
+      
+      console.log('Submitting payload:', payload);
+      
       const res = await userApi.submitChangeRequest(payload);
 
       if (!res.data.success) {
@@ -89,8 +140,10 @@ const UserDashboard = () => {
       } else {
         showNotification(res.data.message || 'Request submitted successfully', 'success');
         setSelectedService('');
+        setSelectedSubQuery('');
         setSelectedProject('');
         setRequestDetails('');
+        setSource('web');
         fetchDashboardData();
       }
     } catch (err) {
@@ -155,7 +208,7 @@ const UserDashboard = () => {
 
           {/* Super Admin Section */}
           <View style={styles.superAdminSection}>
-            <Text style={styles.superAdminTitle}>Super Admin</Text>
+            <Text style={styles.superAdminTitle}>User Dashboard</Text>
             <Text style={styles.superAdminEmail}>{user?.email || 'admin@example.com'}</Text>
             
             {/* Logout Button on Left Side */}
@@ -179,33 +232,9 @@ const UserDashboard = () => {
                 <Text style={styles.subtitle}>Streamline and manage your requests with ease</Text>
               </View>
 
-              {/* Service Dropdown */}
+              {/* Project Type Selection - MOVED TO TOP */}
               <View style={styles.formSection}>
-                <Text style={styles.label}>Service Needed</Text>
-                <View style={styles.spacing} />
-                <View style={styles.inputWrapper}>
-                  <Icon name="cogs" size={20} color={Colors.secondary} style={styles.inputIcon} />
-                  <Dropdown
-                    style={styles.dropdown}
-                    placeholderStyle={styles.placeholderStyle}
-                    selectedTextStyle={styles.selectedTextStyle}
-                    inputSearchStyle={styles.inputSearchStyle}
-                    data={services.map(s => ({ label: s.name, value: s.id }))}
-                    search
-                    maxHeight={200}
-                    labelField="label"
-                    valueField="value"
-                    placeholder="Select a service"
-                    searchPlaceholder="Search..."
-                    value={selectedService}
-                    onChange={item => setSelectedService(item.value)}
-                  />
-                </View>
-              </View>
-
-              {/* Project Type Selection */}
-              <View style={styles.formSection}>
-                <Text style={styles.label}>Project Type</Text>
+                <Text style={styles.label}>Select Project Type</Text>
                 <View style={styles.spacing} />
                 <View style={styles.radioGroup}>
                   {['web', 'app'].map((type) => (
@@ -221,17 +250,17 @@ const UserDashboard = () => {
                         styles.radioText,
                         targetType === type && styles.radioTextSelected
                       ]}>
-                        {type === 'web' ? 'Web Project' : 'App Project'}
+                        {type === 'web' ? 'Web' : 'App'}
                       </Text>
                     </TouchableOpacity>
                   ))}
                 </View>
               </View>
 
-              {/* Project Dropdown */}
+              {/* Project Dropdown - MOVED TO SECOND POSITION */}
               <View style={styles.formSection}>
                 <Text style={styles.label}>
-                  {targetType === 'web' ? 'Select Web Project' : 'Select App Project'}
+                  Select Project
                 </Text>
                 <View style={styles.spacing} />
                 <View style={styles.inputWrapper}>
@@ -249,7 +278,7 @@ const UserDashboard = () => {
                     maxHeight={200}
                     labelField="label"
                     valueField="value"
-                    placeholder={`Select ${targetType === 'web' ? 'Web' : 'App'} Project`}
+                    placeholder="Select Project"
                     searchPlaceholder="Search..."
                     value={selectedProject}
                     onChange={item => setSelectedProject(item.value)}
@@ -257,9 +286,69 @@ const UserDashboard = () => {
                 </View>
               </View>
 
+              {/* Service Dropdown - MOVED TO THIRD POSITION */}
+              <View style={styles.formSection}>
+                <Text style={styles.label}>Change Request For</Text>
+                <View style={styles.spacing} />
+                <View style={styles.inputWrapper}>
+                  <Icon name="cogs" size={20} color={Colors.secondary} style={styles.inputIcon} />
+                  <Dropdown
+                    style={styles.dropdown}
+                    placeholderStyle={styles.placeholderStyle}
+                    selectedTextStyle={styles.selectedTextStyle}
+                    inputSearchStyle={styles.inputSearchStyle}
+                    data={services.map(s => ({ label: s.name, value: s.id }))}
+                    search
+                    maxHeight={200}
+                    labelField="label"
+                    valueField="value"
+                    placeholder="Select a request"
+                    searchPlaceholder="Search..."
+                    value={selectedService}
+                    onChange={item => setSelectedService(item.value)}
+                  />
+                </View>
+              </View>
+
+              {/* SubQuery Dropdown - MOVED TO FOURTH POSITION */}
+              <View style={styles.formSection}>
+                <Text style={styles.label}>Select Sub Query</Text>
+                <View style={styles.spacing} />
+                <View style={styles.inputWrapper}>
+                  <Icon name="list-alt" size={20} color={Colors.secondary} style={styles.inputIcon} />
+                  <Dropdown
+                    style={[styles.dropdown, !selectedService && styles.dropdownDisabled]}
+                    placeholderStyle={styles.placeholderStyle}
+                    selectedTextStyle={styles.selectedTextStyle}
+                    inputSearchStyle={styles.inputSearchStyle}
+                    data={subQueries.map(sq => ({ label: sq.name, value: sq.id }))}
+                    search
+                    maxHeight={200}
+                    labelField="label"
+                    valueField="value"
+                    placeholder={
+                      loadingSubQueries 
+                        ? "Loading subqueries..." 
+                        : !selectedService 
+                        ? "Select a request first" 
+                        : subQueries.length === 0 
+                        ? "No subqueries available" 
+                        : "Select Sub Query"
+                    }
+                    searchPlaceholder="Search..."
+                    value={selectedSubQuery}
+                    onChange={item => setSelectedSubQuery(item.value)}
+                    disabled={!selectedService || loadingSubQueries}
+                  />
+                  {loadingSubQueries && (
+                    <ActivityIndicator size="small" color={Colors.secondary} style={styles.loadingIndicator} />
+                  )}
+                </View>
+              </View>
+
               {/* Priority Level */}
               <View style={styles.formSection}>
-                <Text style={styles.label}>Select Priority Level</Text>
+                <Text style={styles.label}>Priority Level</Text>
                 <View style={styles.spacing} />
                 <View style={styles.priorityGroup}>
                   {['high', 'normal', 'low'].map((lvl) => (
@@ -301,8 +390,9 @@ const UserDashboard = () => {
                   <TextInput
                     style={styles.textarea}
                     multiline
-                    placeholder="Describe the changes you need..."
+                    placeholder="Please describe the changes you need in detail..."
                     value={requestDetails}
+                    placeholderTextColor="#c0c0c0ff"
                     onChangeText={setRequestDetails}
                   />
                 </View>
@@ -321,7 +411,7 @@ const UserDashboard = () => {
             <LinearGradient colors={['#ffffff', '#f8f9fa', '#ffffff']} style={styles.cardGradient}>
               <Text style={styles.historyTitle}>Recent Requests</Text>
               {recentRequests.length === 0 ? (
-                <Text style={styles.noRequests}>No recent requests found.</Text>
+                <Text style={styles.noRequests}>No active requests found.</Text>
               ) : (
                 recentRequests.map((req, index) => (
                   <Animatable.View 
@@ -420,7 +510,7 @@ const styles = StyleSheet.create({
     padding: 16,
   },
   superAdminTitle: {
-    fontSize: 24,
+    fontSize: 35,
     fontWeight: 'bold',
     color: Colors.accent,
     marginBottom: 4,
@@ -548,10 +638,14 @@ const styles = StyleSheet.create({
   },
   inputIcon: {
     marginRight: 10,
+    
   },
   dropdown: {
     flex: 1,
     color: '#000',
+  },
+  dropdownDisabled: {
+    opacity: 0.5,
   },
   placeholderStyle: {
     fontSize: 16,
@@ -564,6 +658,10 @@ const styles = StyleSheet.create({
   inputSearchStyle: {
     height: 40,
     fontSize: 16,
+  },
+  loadingIndicator: {
+    position: 'absolute',
+    right: 15,
   },
   radioGroup: {
     flexDirection: 'row',
@@ -635,7 +733,7 @@ const styles = StyleSheet.create({
     flex: 1,
     color: '#333',
     fontSize: 16,
-    paddingVertical: 12,
+    paddingVertical: 28,
     textAlignVertical: 'top',
     minHeight: 100,
   },

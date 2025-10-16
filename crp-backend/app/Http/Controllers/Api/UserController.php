@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\UserRequest;
 use App\Models\Project;
 use App\Models\Query;
+use App\Models\SubQuery;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Http\Request;
 
@@ -134,7 +135,12 @@ class UserController extends Controller
      * Submit a New Change Request
      * ---------------------
      */
-  public function submitChangeRequest(Request $request)
+/**
+ * ---------------------
+ * Submit a New Change Request
+ * ---------------------
+ */
+public function submitChangeRequest(Request $request)
 {
     try {
         $validated = $request->validate([
@@ -142,6 +148,8 @@ class UserController extends Controller
             'project_id' => 'required|integer',
             'priority' => 'required|in:high,normal,low',
             'request_details' => 'required|string',
+            'sub_query' => 'nullable|integer', // Add sub_query validation
+            'source' => 'required|in:web,app', // Add source validation
             'assigned_to' => 'nullable|string',
             'assigner_comment' => 'nullable|string',
         ]);
@@ -153,6 +161,8 @@ class UserController extends Controller
             'priority' => $validated['priority'],
             'request_details' => $validated['request_details'],
             'status' => 'pending',
+            'sub_query' => $validated['sub_query'] ?? null, // Store sub_query
+            'source' => $validated['source'], // Store source (web/app)
             'assigned_to' => $validated['assigned_to'] ?? null,
             'assigner_comment' => $validated['assigner_comment'] ?? null,
         ]);
@@ -176,24 +186,53 @@ class UserController extends Controller
      * Fetch Request History
      * ---------------------
      */
-    public function getHistory()
-    {
-        try {
-            $requests = UserRequest::with(['project', 'service'])
-                ->where('user_id', Auth::id())
-                ->orderBy('created_at', 'desc')
-                ->get();
 
-            return response()->json([
-                'success' => true,
-                'requests' => $requests,
-            ]);
-        } catch (\Exception $e) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Failed to fetch history',
-                'error' => $e->getMessage(),
-            ], 500);
-        }
+    public function getSubQueries($queryId)
+{
+    try {
+        $subQueries = SubQuery::where('query_id', $queryId)->get();
+        return response()->json([
+            'success' => true,
+            'sub_queries' => $subQueries,
+        ]);
+    } catch (\Exception $e) {
+        return response()->json([
+            'success' => false,
+            'message' => 'Failed to fetch subqueries',
+            'error' => $e->getMessage(),
+        ], 500);
     }
+}
+    public function getHistory()
+{
+    try {
+        $user = Auth::user();
+        
+        $query = UserRequest::with(['project', 'service'])
+            ->where('status', 'completed'); // Only completed requests for everyone
+
+        // Check if user is admin (adjust the email as per your admin email)
+        $isAdmin = $user->email === 'admin@example.com' || $user->email === 'superadmin@example.com';
+        
+        if (!$isAdmin) {
+            // Regular user: show only their completed requests
+            $query->where('user_id', $user->id);
+        }
+        // Admin: shows all completed requests (no user filter)
+
+        $requests = $query->orderBy('created_at', 'desc')->get();
+
+        return response()->json([
+            'success' => true,
+            'requests' => $requests,
+        ]);
+    } catch (\Exception $e) {
+        return response()->json([
+            'success' => false,
+            'message' => 'Failed to fetch history',
+            'error' => $e->getMessage(),
+        ], 500);
+    }
+}
+
 }
