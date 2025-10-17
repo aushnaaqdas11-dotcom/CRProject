@@ -1,3 +1,4 @@
+// screens/AdminDashboard.js
 import React, { useState, useEffect } from 'react';
 import {
   View,
@@ -7,36 +8,36 @@ import {
   TouchableOpacity,
   Alert,
   RefreshControl,
-  ActivityIndicator
+  ActivityIndicator,
+  Dimensions
 } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
 import Icon from 'react-native-vector-icons/FontAwesome';
-import { Colors } from '../styles/theme';
 import { adminAPI } from '../services/apiService';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useAuth } from '../context/AuthContext';
+
+const { width } = Dimensions.get('window');
 
 const AdminDashboard = ({ navigation }) => {
   const [dashboardData, setDashboardData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [user, setUser] = useState(null);
+  const { user, logout } = useAuth();
 
   const loadDashboard = async () => {
     try {
-      const userData = await AsyncStorage.getItem('userData');
-      if (userData) {
-        setUser(JSON.parse(userData));
-      }
-
+      setLoading(true);
       const response = await adminAPI.getDashboard();
+      
       if (response.data.success) {
         setDashboardData(response.data.data);
       } else {
-        Alert.alert('Error', 'Failed to load dashboard data');
+        Alert.alert('Error', response.data.message || 'Failed to load dashboard data');
       }
     } catch (error) {
       console.log('Admin dashboard error:', error);
-      Alert.alert('Error', 'Failed to load admin dashboard');
+      const errorMessage = error.response?.data?.message || 'Failed to load admin dashboard';
+      Alert.alert('Error', errorMessage);
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -53,19 +54,74 @@ const AdminDashboard = ({ navigation }) => {
   }, []);
 
   const handleLogout = async () => {
-    try {
-      await AsyncStorage.removeItem('userToken');
-      await AsyncStorage.removeItem('userData');
-      navigation.navigate('Login');
-    } catch (error) {
-      console.log('Logout error:', error);
+    Alert.alert(
+      'Logout',
+      'Are you sure you want to logout?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Logout',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await logout();
+              navigation.navigate('Login');
+            } catch (error) {
+              Alert.alert('Error', 'Failed to logout');
+            }
+          }
+        }
+      ]
+    );
+  };
+
+  const modules = [
+    {
+      id: 1,
+      title: 'Manage Users',
+      description: 'View, add, and manage user accounts',
+      route: 'ManageUsers',
+      icon: 'users',
+      color: '#667eea',
+      gradient: ['#667eea', '#764ba2']
+    },
+    {
+      id: 2,
+      title: 'Roles & Permissions',
+      description: 'Configure user roles and access levels',
+      route: 'RolesManagement',
+      icon: 'id-badge',
+      color: '#4ECDC4',
+      gradient: ['#4ECDC4', '#48bb78']
+    },
+    {
+      id: 3,
+      title: 'Edit Users',
+      description: 'Modify user details and settings',
+      route: 'ManageUsers',
+      icon: 'edit',
+      color: '#f5576c',
+      gradient: ['#f093fb', '#f5576c']
+    },
+    {
+      id: 4,
+      title: 'Assign Projects',
+      description: 'Manage and assign projects to users',
+      route: 'AssignProjects',
+      icon: 'tasks',
+      color: '#ff6b6b',
+      gradient: ['#ff9e44', '#ff6b6b']
     }
+  ];
+
+  const handleModulePress = (module) => {
+    navigation.navigate(module.route);
   };
 
   if (loading) {
     return (
       <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color={Colors.primary} />
+        <ActivityIndicator size="large" color="#2C3E50" />
         <Text style={styles.loadingText}>Loading Admin Dashboard...</Text>
       </View>
     );
@@ -77,268 +133,266 @@ const AdminDashboard = ({ navigation }) => {
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
         }
+        showsVerticalScrollIndicator={false}
       >
         {/* Header */}
         <LinearGradient
-          colors={[Colors.primary, Colors.secondary]}
+          colors={['#2C3E50', '#4ECDC4']}
           style={styles.header}
         >
-          <Text style={styles.welcomeText}>
-            Welcome, {user?.name || 'Admin'}
-          </Text>
-          <Text style={styles.roleText}>Admin Dashboard</Text>
+          <View style={styles.headerContent}>
+            <View style={styles.headerText}>
+              <Text style={styles.welcomeText}>
+                Welcome, {user?.name || 'Admin'}
+              </Text>
+              <Text style={styles.roleText}>Admin Dashboard</Text>
+            </View>
+            <TouchableOpacity onPress={handleLogout} style={styles.logoutBtn}>
+              <Icon name="sign-out" size={20} color="#fff" />
+            </TouchableOpacity>
+          </View>
         </LinearGradient>
 
-        {/* Stats Cards */}
+        {/* Stats Overview */}
         <View style={styles.statsContainer}>
-          <View style={styles.statCard}>
-            <Text style={styles.statNumber}>{dashboardData?.stats?.total_users || 0}</Text>
-            <Text style={styles.statLabel}>Total Users</Text>
+          <View style={styles.statsRow}>
+            <View style={styles.statCard}>
+              <View style={[styles.statIcon, { backgroundColor: '#667eea' }]}>
+                <Icon name="users" size={24} color="#fff" />
+              </View>
+              <Text style={styles.statNumber}>
+                {dashboardData?.stats?.total_users || 0}
+              </Text>
+              <Text style={styles.statLabel}>Total Users</Text>
+            </View>
+
+            <View style={styles.statCard}>
+              <View style={[styles.statIcon, { backgroundColor: '#4ECDC4' }]}>
+                <Icon name="id-badge" size={24} color="#fff" />
+              </View>
+              <Text style={styles.statNumber}>
+                {dashboardData?.stats?.total_roles || 0}
+              </Text>
+              <Text style={styles.statLabel}>Total Roles</Text>
+            </View>
           </View>
-          <View style={styles.statCard}>
-            <Text style={styles.statNumber}>{dashboardData?.stats?.total_requests || 0}</Text>
-            <Text style={styles.statLabel}>Total Requests</Text>
-          </View>
-          <View style={styles.statCard}>
-            <Text style={styles.statNumber}>{dashboardData?.stats?.pending_requests || 0}</Text>
-            <Text style={styles.statLabel}>Pending</Text>
-          </View>
-          <View style={styles.statCard}>
-            <Text style={styles.statNumber}>{dashboardData?.stats?.completed_requests || 0}</Text>
-            <Text style={styles.statLabel}>Completed</Text>
+
+          <View style={styles.statsRow}>
+            <View style={styles.statCard}>
+              <View style={[styles.statIcon, { backgroundColor: '#f5576c' }]}>
+                <Icon name="tasks" size={24} color="#fff" />
+              </View>
+              <Text style={styles.statNumber}>
+                {dashboardData?.stats?.total_projects || 0}
+              </Text>
+              <Text style={styles.statLabel}>Total Projects</Text>
+            </View>
+
+            <View style={styles.statCard}>
+              <View style={[styles.statIcon, { backgroundColor: '#ff6b6b' }]}>
+                <Icon name="user-plus" size={24} color="#fff" />
+              </View>
+              <Text style={styles.statNumber}>
+                {dashboardData?.stats?.assigners_count || 0}
+              </Text>
+              <Text style={styles.statLabel}>Assigners</Text>
+            </View>
           </View>
         </View>
 
-        {/* Recent Requests */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Recent Requests</Text>
-          {dashboardData?.recent_requests && dashboardData.recent_requests.length > 0 ? (
-            dashboardData.recent_requests.map((request) => (
-              <View key={request.id} style={styles.requestCard}>
-                <Text style={styles.requestTitle}>{request.project?.name || 'No Project'}</Text>
-                <Text style={styles.requestUser}>By: {request.user?.name || 'Unknown User'}</Text>
-                <Text style={styles.requestDetails}>{request.request_details}</Text>
-                <View style={[
-                  styles.statusBadge,
-                  { backgroundColor: getStatusColor(request.status) }
-                ]}>
-                  <Text style={styles.statusText}>
-                    {request.status?.toUpperCase() || 'PENDING'}
-                  </Text>
+        {/* Modules Grid */}
+        <View style={styles.modulesSection}>
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionTitle}>Admin Modules</Text>
+          </View>
+          <View style={styles.modulesGrid}>
+            {modules.map((module, index) => (
+              <TouchableOpacity
+                key={module.id}
+                style={styles.moduleCard}
+                onPress={() => handleModulePress(module)}
+                activeOpacity={0.9}
+              >
+                <View style={styles.moduleContent}>
+                  <LinearGradient
+                    colors={module.gradient}
+                    style={styles.moduleIcon}
+                  >
+                    <Icon name={module.icon} size={32} color="#fff" />
+                  </LinearGradient>
+                  <Text style={styles.moduleTitle}>{module.title}</Text>
+                  <Text style={styles.moduleDescription}>{module.description}</Text>
                 </View>
-              </View>
-            ))
-          ) : (
-            <Text style={styles.noDataText}>No recent requests</Text>
-          )}
-        </View>
-
-        {/* Recent Users */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Recent Users</Text>
-          {dashboardData?.recent_users && dashboardData.recent_users.length > 0 ? (
-            dashboardData.recent_users.map((user) => (
-              <View key={user.id} style={styles.userCard}>
-                <Text style={styles.userName}>{user.name}</Text>
-                <Text style={styles.userEmail}>{user.email}</Text>
-                <Text style={styles.userRole}>Role: {getRoleName(user.role)}</Text>
-              </View>
-            ))
-          ) : (
-            <Text style={styles.noDataText}>No users found</Text>
-          )}
+              </TouchableOpacity>
+            ))}
+          </View>
         </View>
       </ScrollView>
-
-      {/* Logout Button */}
-      <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
-        <LinearGradient
-          colors={[Colors.primary, Colors.secondary]}
-          style={styles.logoutGradient}
-        >
-          <Icon name="sign-out" size={20} color={Colors.accent} />
-          <Text style={styles.logoutText}>Logout</Text>
-        </LinearGradient>
-      </TouchableOpacity>
     </View>
   );
 };
 
-const getStatusColor = (status) => {
-  switch (status?.toLowerCase()) {
-    case 'completed': return '#2ed573';
-    case 'inprogress': return '#ffa502';
-    case 'pending': return '#ff4757';
-    default: return '#747d8c';
-  }
-};
-
-const getRoleName = (role) => {
-  switch (role) {
-    case 1: return 'Admin';
-    case 2: return 'User';
-    case 3: return 'Resolver';
-    case 4: return 'Assigner';
-    default: return 'Unknown';
-  }
-};
-
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#f8f9fa' },
-  loadingContainer: { 
-    flex: 1, 
-    justifyContent: 'center', 
+  container: {
+    flex: 1,
+    backgroundColor: '#F8FAFC',
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#f8f9fa',
+    backgroundColor: '#F8FAFC',
   },
   loadingText: {
     marginTop: 10,
-    color: Colors.primary,
+    color: '#2C3E50',
     fontSize: 16,
   },
   header: {
-    padding: 20,
+    paddingHorizontal: 20,
     paddingTop: 60,
     paddingBottom: 30,
+    borderBottomLeftRadius: 30,
+    borderBottomRightRadius: 30,
+  },
+  headerContent: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  headerText: {
+    flex: 1,
   },
   welcomeText: {
     fontSize: 24,
     fontWeight: 'bold',
-    color: Colors.accent,
+    color: '#fff',
     marginBottom: 5,
   },
   roleText: {
     fontSize: 16,
-    color: Colors.accent,
-    opacity: 0.8,
+    color: '#fff',
+    opacity: 0.9,
+  },
+  logoutBtn: {
+    padding: 10,
+    borderRadius: 10,
+    backgroundColor: 'rgba(255,255,255,0.2)',
   },
   statsContainer: {
+    padding: 20,
+    marginTop: -20,
+  },
+  statsRow: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
-    padding: 15,
-    marginTop: -30,
     justifyContent: 'space-between',
+    marginBottom: 15,
   },
   statCard: {
-    width: '48%',
-    backgroundColor: Colors.accent,
-    marginBottom: 10,
-    padding: 15,
-    borderRadius: 10,
+    width: (width - 50) / 2,
+    backgroundColor: '#fff',
+    borderRadius: 20,
+    padding: 20,
     alignItems: 'center',
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
+    shadowOffset: {
+      width: 0,
+      height: 4,
+    },
     shadowOpacity: 0.1,
-    shadowRadius: 3,
-    elevation: 3,
+    shadowRadius: 12,
+    elevation: 5,
+  },
+  statIcon: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 10,
   },
   statNumber: {
     fontSize: 24,
     fontWeight: 'bold',
-    color: Colors.primary,
+    color: '#2C3E50',
+    marginBottom: 5,
   },
   statLabel: {
     fontSize: 12,
-    color: Colors.primary,
-    marginTop: 5,
+    color: '#666',
     textAlign: 'center',
   },
-  section: {
+  modulesSection: {
     padding: 20,
+    paddingTop: 10,
+  },
+  sectionHeader: {
+    alignItems: 'center',
+    marginBottom: 25,
   },
   sectionTitle: {
-    fontSize: 18,
+    fontSize: 28,
     fontWeight: 'bold',
-    color: Colors.dark,
-    marginBottom: 15,
+    backgroundGradient: 'linear-gradient(135deg, #2C3E50, #4ECDC4)',
+    color: '#2C3E50',
   },
-  requestCard: {
-    backgroundColor: Colors.accent,
-    padding: 15,
-    borderRadius: 10,
-    marginBottom: 10,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
-    elevation: 2,
-  },
-  requestTitle: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: Colors.dark,
-    marginBottom: 5,
-  },
-  requestUser: {
-    fontSize: 14,
-    color: '#666',
-    marginBottom: 5,
-  },
-  requestDetails: {
-    fontSize: 14,
-    color: '#666',
-    marginBottom: 10,
-  },
-  userCard: {
-    backgroundColor: Colors.accent,
-    padding: 15,
-    borderRadius: 10,
-    marginBottom: 10,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
-    elevation: 2,
-  },
-  userName: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: Colors.dark,
-    marginBottom: 5,
-  },
-  userEmail: {
-    fontSize: 14,
-    color: '#666',
-    marginBottom: 5,
-  },
-  userRole: {
-    fontSize: 14,
-    color: '#666',
-  },
-  statusBadge: {
-    alignSelf: 'flex-start',
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: 15,
-  },
-  statusText: {
-    color: Colors.accent,
-    fontSize: 12,
-    fontWeight: 'bold',
-  },
-  noDataText: {
-    textAlign: 'center',
-    color: '#666',
-    fontStyle: 'italic',
-    marginVertical: 20,
-  },
-  logoutButton: {
-    margin: 20,
-    height: 50,
-    borderRadius: 10,
-    overflow: 'hidden',
-  },
-  logoutGradient: {
-    flex: 1,
+  modulesGrid: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
+  },
+  moduleCard: {
+    width: (width - 50) / 2,
+    height: 200,
+    marginBottom: 20,
+    borderRadius: 24,
+    backgroundColor: 'rgba(255, 255, 255, 0.95)',
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 4,
+    },
+    shadowOpacity: 0.1,
+    shadowRadius: 20,
+    elevation: 5,
+    borderWidth: 1,
+    borderColor: 'rgba(76, 205, 196, 0.1)',
+  },
+  moduleContent: {
+    flex: 1,
+    padding: 25,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  moduleIcon: {
+    width: 80,
+    height: 80,
+    borderRadius: 20,
     justifyContent: 'center',
     alignItems: 'center',
+    marginBottom: 20,
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 4,
+    },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 6,
   },
-  logoutText: {
-    color: Colors.accent,
-    fontSize: 16,
+  moduleTitle: {
+    fontSize: 18,
     fontWeight: 'bold',
-    marginLeft: 10,
+    color: '#2C3E50',
+    textAlign: 'center',
+    marginBottom: 8,
+  },
+  moduleDescription: {
+    fontSize: 14,
+    color: '#2C3E50',
+    opacity: 0.6,
+    textAlign: 'center',
+    lineHeight: 18,
   },
 });
 

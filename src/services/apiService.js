@@ -1,6 +1,7 @@
+// services/apiService.js
 import axios from 'axios';
 
-const BASE_URL = 'http://10.50.206.72:8000/api'; // Replace with your actual backend URL
+const BASE_URL = 'http://10.50.206.72:8000/api';
 
 const apiService = axios.create({
   baseURL: BASE_URL,
@@ -9,20 +10,19 @@ const apiService = axios.create({
   },
 });
 
-// Interceptor to handle 401 errors
+// Interceptor to handle errors without automatic logout
 apiService.interceptors.response.use(
   response => response,
   error => {
-    if (error.response?.status === 401) {
-      return Promise.reject({ message: 'Session expired. Please log in again.' });
-    }
+    // Don't automatically logout on 401, let components handle it
     return Promise.reject(error);
   }
 );
 
 let authToken = null;
 
-export default {
+// Admin API methods
+export const adminAPI = {
   setAuthToken(token) {
     authToken = token;
     if (token) {
@@ -30,6 +30,77 @@ export default {
     } else {
       delete apiService.defaults.headers.common['Authorization'];
     }
+  },
+
+  // Dashboard
+  async getDashboard() {
+    return apiService.get('/admin/dashboard');
+  },
+
+  // Users Management
+  async getUsers(params = {}) {
+    return apiService.get('/admin/users', { params });
+  },
+
+  async getUser(id) {
+    return apiService.get(`/admin/users/${id}`);
+  },
+
+  async createUser(userData) {
+    return apiService.post('/admin/users', userData);
+  },
+
+  async updateUser(id, userData) {
+    return apiService.put(`/admin/users/${id}`, userData);
+  },
+
+  async deleteUser(id) {
+    return apiService.delete(`/admin/users/${id}`);
+  },
+
+  // Roles Management
+  async getRoles(params = {}) {
+    return apiService.get('/admin/roles', { params });
+  },
+
+  async createRole(roleData) {
+    return apiService.post('/admin/roles', roleData);
+  },
+
+  async updateRole(id, roleData) {
+    return apiService.put(`/admin/roles/${id}`, roleData);
+  },
+
+  async deleteRole(id) {
+    return apiService.delete(`/admin/roles/${id}`);
+  },
+
+  // Project Assignment
+  async getAssignableUsers(params = {}) {
+    return apiService.get('/admin/assignable-users', { params });
+  },
+
+  async getProjectsForAssignment() {
+    return apiService.get('/admin/projects');
+  },
+
+  async assignProjectsToUser(assignmentData) {
+    return apiService.post('/admin/assign-projects', assignmentData);
+  },
+
+  async getUserAssignedProjects(userId) {
+    return apiService.get(`/admin/users/${userId}/assigned-projects`);
+  },
+
+  async removeProjectAssignment(userId, projectId) {
+    return apiService.delete(`/admin/users/${userId}/projects/${projectId}`);
+  }
+};
+
+// Existing user APIs remain the same
+export default {
+  setAuthToken(token) {
+    adminAPI.setAuthToken(token);
   },
 
   async login(login, password) {
