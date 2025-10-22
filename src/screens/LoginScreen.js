@@ -526,7 +526,7 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.white,
     borderTopWidth: 1,
     borderTopColor: '#E5E7EB',
-    paddingVertical: 16,
+    paddingVertical: 15,
   },
   footerContent: {
     alignItems: 'center',

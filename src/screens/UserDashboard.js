@@ -36,7 +36,6 @@ const UserDashboard = () => {
 
   useEffect(() => {
     fetchDashboardData();
-    // Increased auto-refresh time from 60 seconds to 120 seconds (2 minutes)
     intervalRef.current = setInterval(fetchDashboardData, 620000);
     return () => clearInterval(intervalRef.current);
   }, []);
@@ -126,8 +125,8 @@ const UserDashboard = () => {
         project_id: selectedProject,
         priority,
         request_details: requestDetails,
-        sub_query: selectedSubQuery, // Add sub_query to payload
-        source: source, // Add source to payload
+        sub_query: selectedSubQuery,
+        source: source,
       };
       
       console.log('Submitting payload:', payload);
@@ -163,7 +162,7 @@ const UserDashboard = () => {
 
   if (loading) return (
     <View style={styles.loader}>
-      <ActivityIndicator size="large" color={Colors.accent} />
+      <ActivityIndicator size="large" color="#2C3E50" />
       <Text style={styles.loadingText}>Loading dashboard...</Text>
     </View>
   );
@@ -172,259 +171,249 @@ const UserDashboard = () => {
     <View style={styles.container}>
       <StatusBar barStyle="light-content" translucent backgroundColor="transparent" />
       
-      {/* Navbar */}
-      <View style={styles.navbar}>
-        <View style={styles.navbarContent}>
-          {/* Logo Container on Left Side */}
-          <LinearGradient colors={[Colors.primary, Colors.secondary]} style={styles.logoContainer}>
-            <Text style={styles.navbarTitle}>Change Request Portal</Text>
-          </LinearGradient>
-
-          {/* Action Buttons on Right Side - Only View History now */}
-          <View style={styles.actionButtons}>
-            <TouchableOpacity style={styles.viewHistoryBtn} onPress={() => navigation.navigate('UserHistory')}>
-              <LinearGradient colors={[Colors.primary, Colors.secondary]} style={styles.btnGradient}>
-                <Text style={styles.btnText}>View All History</Text>
+      {/* Header - Matching Admin Dashboard */}
+      <LinearGradient
+        colors={['#2C3E50', '#4ECDC4']}
+        style={styles.header}
+      >
+        <View style={styles.headerContent}>
+          <View style={styles.headerText}>
+            <Text style={styles.welcomeText}>
+              Welcome, {user?.name || 'User'}
+            </Text>
+            <Text style={styles.roleText}>User Dashboard</Text>
+          </View>
+          <View style={styles.headerButtons}>
+            <TouchableOpacity 
+              style={styles.viewHistoryBtn} 
+              onPress={() => navigation.navigate('UserHistory')}
+            >
+              <LinearGradient colors={['rgba(255,255,255,0.2)', 'rgba(255,255,255,0.3)']} style={styles.viewHistoryBtnGradient}>
+                <Icon name="history" size={16} color="#fff" style={styles.viewHistoryIcon} />
+                <Text style={styles.viewHistoryText}>View History</Text>
               </LinearGradient>
+            </TouchableOpacity>
+            <TouchableOpacity onPress={handleLogout} style={styles.logoutBtn}>
+              <Icon name="sign-out" size={20} color="#fff" />
             </TouchableOpacity>
           </View>
         </View>
-      </View>
+      </LinearGradient>
 
       {/* Main Content */}
-      <LinearGradient colors={[Colors.dark, Colors.primary, Colors.dark]} style={styles.background}>
-        <ScrollView contentContainerStyle={styles.scrollContent}>
-          {notification.message && (
-            <Animatable.View 
-              animation="fadeInDown"
-              style={[
-                styles.notification, 
-                notification.type === 'error' ? styles.error : styles.success
-              ]}
-            >
-              <Text style={{ color: 'white' }}>{notification.message}</Text>
-            </Animatable.View>
-          )}
+      <ScrollView 
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+      >
+        {notification.message && (
+          <Animatable.View 
+            animation="fadeInDown"
+            style={[
+              styles.notification, 
+              notification.type === 'error' ? styles.error : styles.success
+            ]}
+          >
+            <Text style={styles.notificationText}>{notification.message}</Text>
+          </Animatable.View>
+        )}
 
-          {/* Super Admin Section */}
-          <View style={styles.superAdminSection}>
-            <Text style={styles.superAdminTitle}>User Dashboard</Text>
-            <Text style={styles.superAdminEmail}>{user?.email || 'admin@example.com'}</Text>
+        {/* Dashboard Title */}
+        <Animatable.View animation="fadeInDown" duration={800} style={styles.titleSection}>
+          <Text style={styles.dashboardTitle}>Project Enhancement Portal</Text>
+          <Text style={styles.dashboardSubtitle}>Submit Change Request</Text>
+          <Text style={styles.dashboardDescription}>Streamline and manage your requests with ease</Text>
+        </Animatable.View>
+
+        {/* Request Form */}
+        <Animatable.View animation="fadeInUp" duration={800} delay={200} style={styles.requestForm}>
+          <LinearGradient colors={['#ffffff', '#f8f9fa', '#ffffff']} style={styles.cardGradient}>
             
-            {/* Logout Button on Left Side */}
-            <TouchableOpacity style={styles.logoutBtn} onPress={handleLogout}>
-              <LinearGradient colors={['#EF4444', '#DC2626']} style={styles.logoutBtnGradient}>
-                <Text style={styles.logoutBtnText}>Logout</Text>
+            {/* Project Type Selection */}
+            <View style={styles.formSection}>
+              <Text style={styles.label}>Select Project Type</Text>
+              <View style={styles.radioGroup}>
+                {['web', 'app'].map((type) => (
+                  <TouchableOpacity
+                    key={type}
+                    style={[
+                      styles.radioOption,
+                      targetType === type && styles.radioSelected,
+                    ]}
+                    onPress={() => setTargetType(type)}
+                  >
+                    <Text style={[
+                      styles.radioText,
+                      targetType === type && styles.radioTextSelected
+                    ]}>
+                      {type === 'web' ? 'Web' : 'App'}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </View>
+
+            {/* Project Dropdown */}
+            <View style={styles.formSection}>
+              <Text style={styles.label}>Select Project</Text>
+              <View style={styles.inputWrapper}>
+                <Icon name="folder" size={20} color="#4ECDC4" style={styles.inputIcon} />
+                <Dropdown
+                  style={styles.dropdown}
+                  placeholderStyle={styles.placeholderStyle}
+                  selectedTextStyle={styles.selectedTextStyle}
+                  inputSearchStyle={styles.inputSearchStyle}
+                  data={(targetType === 'web' ? webProjects : appProjects).map(p => ({
+                    label: p.name,
+                    value: p.id,
+                  }))}
+                  search
+                  maxHeight={200}
+                  labelField="label"
+                  valueField="value"
+                  placeholder="Select Project"
+                  searchPlaceholder="Search..."
+                  value={selectedProject}
+                  onChange={item => setSelectedProject(item.value)}
+                />
+              </View>
+            </View>
+
+            {/* Service Dropdown */}
+            <View style={styles.formSection}>
+              <Text style={styles.label}>Change Request For</Text>
+              <View style={styles.inputWrapper}>
+                <Icon name="cogs" size={20} color="#4ECDC4" style={styles.inputIcon} />
+                <Dropdown
+                  style={styles.dropdown}
+                  placeholderStyle={styles.placeholderStyle}
+                  selectedTextStyle={styles.selectedTextStyle}
+                  inputSearchStyle={styles.inputSearchStyle}
+                  data={services.map(s => ({ label: s.name, value: s.id }))}
+                  search
+                  maxHeight={200}
+                  labelField="label"
+                  valueField="value"
+                  placeholder="Select a request"
+                  searchPlaceholder="Search..."
+                  value={selectedService}
+                  onChange={item => setSelectedService(item.value)}
+                />
+              </View>
+            </View>
+
+            {/* SubQuery Dropdown */}
+            <View style={styles.formSection}>
+              <Text style={styles.label}>Select Sub Query</Text>
+              <View style={styles.inputWrapper}>
+                <Icon name="list-alt" size={20} color="#4ECDC4" style={styles.inputIcon} />
+                <Dropdown
+                  style={[styles.dropdown, !selectedService && styles.dropdownDisabled]}
+                  placeholderStyle={styles.placeholderStyle}
+                  selectedTextStyle={styles.selectedTextStyle}
+                  inputSearchStyle={styles.inputSearchStyle}
+                  data={subQueries.map(sq => ({ label: sq.name, value: sq.id }))}
+                  search
+                  maxHeight={200}
+                  labelField="label"
+                  valueField="value"
+                  placeholder={
+                    loadingSubQueries 
+                      ? "Loading subqueries..." 
+                      : !selectedService 
+                      ? "Select a request first" 
+                      : subQueries.length === 0 
+                      ? "No subqueries available" 
+                      : "Select Sub Query"
+                  }
+                  searchPlaceholder="Search..."
+                  value={selectedSubQuery}
+                  onChange={item => setSelectedSubQuery(item.value)}
+                  disabled={!selectedService || loadingSubQueries}
+                />
+                {loadingSubQueries && (
+                  <ActivityIndicator size="small" color="#4ECDC4" style={styles.loadingIndicator} />
+                )}
+              </View>
+            </View>
+
+            {/* Priority Level */}
+            <View style={styles.formSection}>
+              <Text style={styles.label}>Priority Level</Text>
+              <View style={styles.priorityGroup}>
+                {[
+                  { key: 'high', label: 'High' },
+                  { key: 'normal', label: 'Normal' }, 
+                  { key: 'low', label: 'Anytime' }
+                ].map((lvl) => (
+                  <TouchableOpacity
+                    key={lvl.key}
+                    style={[
+                      styles.priorityOption,
+                      priority === lvl.key &&
+                        (lvl.key === 'high'
+                          ? styles.priorityHighSelected
+                          : lvl.key === 'normal'
+                          ? styles.priorityNormalSelected
+                          : styles.priorityLowSelected),
+                    ]}
+                    onPress={() => setPriority(lvl.key)}
+                  >
+                    <Text
+                      style={[
+                        styles.priorityText,
+                        priority === lvl.key && styles.priorityTextSelected,
+                      ]}
+                    >
+                      {lvl.label}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </View>
+
+            {/* Change Request Details */}
+            <View style={styles.formSection}>
+              <Text style={styles.label}>Change Request Details</Text>
+              <View style={styles.textareaWrapper}>
+                <Icon name="edit" size={20} color="#4ECDC4" style={styles.textareaIcon} />
+                <TextInput
+                  style={styles.textarea}
+                  multiline
+                  placeholder="Please describe the changes you need in detail..."
+                  value={requestDetails}
+                  placeholderTextColor="#999"
+                  onChangeText={setRequestDetails}
+                  textAlignVertical="top"
+                />
+              </View>
+            </View>
+
+            {/* Submit Button */}
+            <TouchableOpacity style={styles.submitBtn} onPress={handleSubmit}>
+              <LinearGradient colors={['#2C3E50', '#4ECDC4']} style={styles.submitBtnGradient}>
+                <Text style={styles.submitBtnText}>Submit Request</Text>
               </LinearGradient>
             </TouchableOpacity>
-          </View>
+          </LinearGradient>
+        </Animatable.View>
 
-          <View style={styles.divider} />
-
-          <Animatable.View animation="fadeInDown" duration={800}>
-            <Text style={styles.dashboardTitle}>Project Enhancement Portal</Text>
-          </Animatable.View>
-          
-          <Animatable.View animation="fadeInUp" duration={800} delay={200} style={styles.requestForm}>
-            <LinearGradient colors={['#ffffff', '#f8f9fa', '#ffffff']} style={styles.cardGradient}>
-              <View style={styles.header}>
-                <Text style={styles.formTitle}>Submit Change Request</Text>
-                <Text style={styles.subtitle}>Streamline and manage your requests with ease</Text>
-              </View>
-
-              {/* Project Type Selection - MOVED TO TOP */}
-              <View style={styles.formSection}>
-                <Text style={styles.label}>Select Project Type</Text>
-                <View style={styles.spacing} />
-                <View style={styles.radioGroup}>
-                  {['web', 'app'].map((type) => (
-                    <TouchableOpacity
-                      key={type}
-                      style={[
-                        styles.radioOption,
-                        targetType === type && styles.radioSelected,
-                      ]}
-                      onPress={() => setTargetType(type)}
-                    >
-                      <Text style={[
-                        styles.radioText,
-                        targetType === type && styles.radioTextSelected
-                      ]}>
-                        {type === 'web' ? 'Web' : 'App'}
-                      </Text>
-                    </TouchableOpacity>
-                  ))}
-                </View>
-              </View>
-
-              {/* Project Dropdown - MOVED TO SECOND POSITION */}
-              <View style={styles.formSection}>
-                <Text style={styles.label}>
-                  Select Project
-                </Text>
-                <View style={styles.spacing} />
-                <View style={styles.inputWrapper}>
-                  <Icon name="folder" size={20} color={Colors.secondary} style={styles.inputIcon} />
-                  <Dropdown
-                    style={styles.dropdown}
-                    placeholderStyle={styles.placeholderStyle}
-                    selectedTextStyle={styles.selectedTextStyle}
-                    inputSearchStyle={styles.inputSearchStyle}
-                    data={(targetType === 'web' ? webProjects : appProjects).map(p => ({
-                      label: p.name,
-                      value: p.id,
-                    }))}
-                    search
-                    maxHeight={200}
-                    labelField="label"
-                    valueField="value"
-                    placeholder="Select Project"
-                    searchPlaceholder="Search..."
-                    value={selectedProject}
-                    onChange={item => setSelectedProject(item.value)}
-                  />
-                </View>
-              </View>
-
-              {/* Service Dropdown - MOVED TO THIRD POSITION */}
-              <View style={styles.formSection}>
-                <Text style={styles.label}>Change Request For</Text>
-                <View style={styles.spacing} />
-                <View style={styles.inputWrapper}>
-                  <Icon name="cogs" size={20} color={Colors.secondary} style={styles.inputIcon} />
-                  <Dropdown
-                    style={styles.dropdown}
-                    placeholderStyle={styles.placeholderStyle}
-                    selectedTextStyle={styles.selectedTextStyle}
-                    inputSearchStyle={styles.inputSearchStyle}
-                    data={services.map(s => ({ label: s.name, value: s.id }))}
-                    search
-                    maxHeight={200}
-                    labelField="label"
-                    valueField="value"
-                    placeholder="Select a request"
-                    searchPlaceholder="Search..."
-                    value={selectedService}
-                    onChange={item => setSelectedService(item.value)}
-                  />
-                </View>
-              </View>
-
-              {/* SubQuery Dropdown - MOVED TO FOURTH POSITION */}
-              <View style={styles.formSection}>
-                <Text style={styles.label}>Select Sub Query</Text>
-                <View style={styles.spacing} />
-                <View style={styles.inputWrapper}>
-                  <Icon name="list-alt" size={20} color={Colors.secondary} style={styles.inputIcon} />
-                  <Dropdown
-                    style={[styles.dropdown, !selectedService && styles.dropdownDisabled]}
-                    placeholderStyle={styles.placeholderStyle}
-                    selectedTextStyle={styles.selectedTextStyle}
-                    inputSearchStyle={styles.inputSearchStyle}
-                    data={subQueries.map(sq => ({ label: sq.name, value: sq.id }))}
-                    search
-                    maxHeight={200}
-                    labelField="label"
-                    valueField="value"
-                    placeholder={
-                      loadingSubQueries 
-                        ? "Loading subqueries..." 
-                        : !selectedService 
-                        ? "Select a request first" 
-                        : subQueries.length === 0 
-                        ? "No subqueries available" 
-                        : "Select Sub Query"
-                    }
-                    searchPlaceholder="Search..."
-                    value={selectedSubQuery}
-                    onChange={item => setSelectedSubQuery(item.value)}
-                    disabled={!selectedService || loadingSubQueries}
-                  />
-                  {loadingSubQueries && (
-                    <ActivityIndicator size="small" color={Colors.secondary} style={styles.loadingIndicator} />
-                  )}
-                </View>
-              </View>
-
-              {/* Priority Level */}
-              <View style={styles.formSection}>
-                <Text style={styles.label}>Priority Level</Text>
-                <View style={styles.spacing} />
-                <View style={styles.priorityGroup}>
-                  {['high', 'normal', 'low'].map((lvl) => (
-                    <TouchableOpacity
-                      key={lvl}
-                      style={[
-                        styles.priorityOption,
-                        priority === lvl &&
-                          (lvl === 'high'
-                            ? styles.priorityHighSelected
-                            : lvl === 'normal'
-                            ? styles.priorityNormalSelected
-                            : styles.priorityLowSelected),
-                      ]}
-                      onPress={() => setPriority(lvl)}
-                    >
-                      <Text
-                        style={[
-                          styles.priorityText,
-                          priority === lvl && styles.priorityTextSelected,
-                        ]}
-                      >
-                        {lvl === 'low'
-                          ? 'Anytime'
-                          : lvl.charAt(0).toUpperCase() + lvl.slice(1)}
-                      </Text>
-                    </TouchableOpacity>
-                  ))}
-                </View>
-              </View>
-
-              {/* Change Request Details */}
-              <View style={styles.formSection}>
-                <Text style={styles.sectionTitle}>Change Request Details</Text>
-                <View style={styles.divider} />
-                <View style={styles.spacing} />
-                <View style={styles.crdinputWrapper}>
-                  <Icon name="edit" size={20} color={Colors.secondary} style={styles.inputIcon} />
-                  <TextInput
-                    style={styles.textarea}
-                    multiline
-                    placeholder="Please describe the changes you need in detail..."
-                    value={requestDetails}
-                    placeholderTextColor="#c0c0c0ff"
-                    onChangeText={setRequestDetails}
-                  />
-                </View>
-              </View>
-
-              <View style={styles.spacingLarge} />
-              <TouchableOpacity style={styles.submitBtn} onPress={handleSubmit}>
-                <LinearGradient colors={[Colors.primary, Colors.secondary]} style={styles.submitBtnGradient}>
-                  <Text style={styles.submitBtnText}>Submit Request</Text>
-                </LinearGradient>
-              </TouchableOpacity>
-            </LinearGradient>
-          </Animatable.View>
-
-          <Animatable.View animation="fadeInUp" duration={800} delay={400} style={styles.requestsHistory}>
-            <LinearGradient colors={['#ffffff', '#f8f9fa', '#ffffff']} style={styles.cardGradient}>
-              <Text style={styles.historyTitle}>Recent Requests</Text>
-              {recentRequests.length === 0 ? (
-                <Text style={styles.noRequests}>No active requests found.</Text>
-              ) : (
-                recentRequests.map((req, index) => (
-                  <Animatable.View 
-                    key={req.id} 
-                    animation="fadeInRight" 
-                    duration={600}
-                    delay={index * 100}
-                    style={styles.requestCard}
-                  >
+        {/* Recent Requests */}
+        <Animatable.View animation="fadeInUp" duration={800} delay={400} style={styles.requestsHistory}>
+          <LinearGradient colors={['#ffffff', '#f8f9fa', '#ffffff']} style={styles.cardGradient}>
+            <Text style={styles.historyTitle}>Recent Requests</Text>
+            {recentRequests.length === 0 ? (
+              <Text style={styles.noRequests}>No active requests found.</Text>
+            ) : (
+              recentRequests.map((req, index) => (
+                <Animatable.View 
+                  key={req.id} 
+                  animation="fadeInRight" 
+                  duration={600}
+                  delay={index * 100}
+                  style={styles.requestCard}
+                >
+                  <View style={styles.requestHeader}>
                     <Text style={styles.serviceName}>{req.service?.name || 'No Service'}</Text>
-                    <Text style={styles.projectName}>Source: {req.project?.type === 'app' ? 'App' : 'Web'} - {req.project?.name || 'N/A'}</Text>
-                    <Text style={styles.requestDate}>{new Date(req.created_at).toLocaleDateString()}</Text>
-                    <Text style={styles.requestContent}>{req.request_details || 'No details'}</Text>
                     <Text style={[
                       styles.statusBadge,
                       req.status === 'pending' ? styles.statusPending :
@@ -432,195 +421,146 @@ const UserDashboard = () => {
                     ]}>
                       {req.status?.charAt(0).toUpperCase() + req.status?.slice(1)}
                     </Text>
-                  </Animatable.View>
-                ))
-              )}
-            </LinearGradient>
-          </Animatable.View>
-        </ScrollView>
-      </LinearGradient>
+                  </View>
+                  <Text style={styles.projectName}>Source: {req.project?.type === 'app' ? 'App' : 'Web'} - {req.project?.name || 'N/A'}</Text>
+                  <Text style={styles.requestDate}>{new Date(req.created_at).toLocaleDateString()}</Text>
+                  <Text style={styles.requestContent}>{req.request_details || 'No details'}</Text>
+                </Animatable.View>
+              ))
+            )}
+          </LinearGradient>
+        </Animatable.View>
+      </ScrollView>
     </View>
   );
 };
 
 const styles = StyleSheet.create({
-  container: { flex: 1 },
-  background: { flex: 1 },
+  container: { 
+    flex: 1,
+    backgroundColor: '#F8FAFC',
+  },
   scrollContent: {
     flexGrow: 1,
-    padding: 16,
+    padding: 20,
+    paddingTop: 10,
   },
   
-  // Navbar Styles
-  navbar: {
-    backgroundColor: Colors.white, 
-    borderBottomWidth: 1, 
-    borderBottomColor: '#e0e0e0', 
-    paddingHorizontal: 16,
-    paddingTop: 50,
-    paddingBottom: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 3,
-    elevation: 3,
+  // Header - Matching Admin Dashboard
+  header: {
+    paddingHorizontal: 20,
+    paddingTop: 60,
+    paddingBottom: 30,
+    borderBottomLeftRadius: 30,
+    borderBottomRightRadius: 30,
   },
-  navbarContent: {
-    flexDirection: 'row', 
-    justifyContent: 'space-between', 
+  headerContent: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
     alignItems: 'center',
   },
-  logoContainer: {
-    paddingHorizontal: 20,
-    paddingVertical: 10,
-    borderRadius: 8,
+  headerText: {
+    flex: 1,
   },
-  navbarTitle: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: 'white',
-  },
-  actionButtons: {
+  headerButtons: {
     flexDirection: 'row',
+    alignItems: 'center',
     gap: 10,
   },
-  viewHistoryBtn: {
-    borderRadius: 8,
-    overflow: 'hidden',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 3,
-    elevation: 2,
-  },
-  btnGradient: {
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    alignItems: 'center',
-  },
-  btnText: {
-    color: Colors.accent,
-    fontWeight: '600',
-    fontSize: 14,
-  },
-  
-  // Super Admin Section
-  superAdminSection: {
-    marginBottom: 20,
-    padding: 16,
-  },
-  superAdminTitle: {
-    fontSize: 35,
+  welcomeText: {
+    fontSize: 24,
     fontWeight: 'bold',
-    color: Colors.accent,
-    marginBottom: 4,
+    color: '#fff',
+    marginBottom: 5,
   },
-  superAdminEmail: {
+  roleText: {
     fontSize: 16,
-    color: Colors.accent,
-    opacity: 0.8,
-    marginBottom: 16,
+    color: '#fff',
+    opacity: 0.9,
   },
-  logoutBtn: {
-    borderRadius: 8,
+  // View History Button
+  viewHistoryBtn: {
+    borderRadius: 10,
     overflow: 'hidden',
-    alignSelf: 'flex-start',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
-    shadowRadius: 3,
-    elevation: 2,
+    shadowRadius: 4,
+    elevation: 3,
   },
-  logoutBtnGradient: {
-    paddingHorizontal: 20,
-    paddingVertical: 12,
+  viewHistoryBtnGradient: {
+    flexDirection: 'row',
     alignItems: 'center',
+    paddingHorizontal: 15,
+    paddingVertical: 10,
+    borderRadius: 10,
   },
-  logoutBtnText: {
-    color: 'white',
+  viewHistoryIcon: {
+    marginRight: 6,
+  },
+  viewHistoryText: {
+    color: '#fff',
     fontWeight: '600',
     fontSize: 14,
   },
-  divider: {
-    height: 1,
-    backgroundColor: 'rgba(255, 255, 255, 0.3)',
-    marginBottom: 20,
+  // Logout Button
+  logoutBtn: {
+    padding: 10,
+    borderRadius: 10,
+    backgroundColor: 'rgba(255,255,255,0.2)',
   },
   
-  dashboardTitle: {
-    fontSize: 28,
+  // Title Section
+  titleSection: {
     marginBottom: 25,
-    color: Colors.accent,
+    alignItems: 'center',
+  },
+  dashboardTitle: {
+    fontSize: 26,
+    fontWeight: 'bold',
+    color: '#2C3E50',
     textAlign: 'center',
-    fontWeight: 'bold'
+    marginBottom: 8,
+  },
+  dashboardSubtitle: {
+    fontSize: 20,
+    color: '#2C3E50',
+    textAlign: 'center',
+    marginBottom: 4,
+    opacity: 0.9,
+  },
+  dashboardDescription: {
+    fontSize: 14,
+    color: '#2C3E50',
+    textAlign: 'center',
+    opacity: 0.8,
   },
   
   // Form Styles
   requestForm: {
-    borderRadius: 20,
+    borderRadius: 16,
     overflow: 'hidden',
-    marginBottom: 20,
+    marginBottom: 25,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.1,
-    shadowRadius: 20,
-    elevation: 10,
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.15,
+    shadowRadius: 16,
+    elevation: 8,
   },
   cardGradient: {
-    padding: 25,
-  },
-  header: {
-    alignItems: 'center',
-    marginBottom: 25,
-  },
-  formTitle: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#2a5298',
-    marginBottom: 8,
-    textAlign: 'center',
-  },
-  subtitle: {
-    fontSize: 14,
-    color: '#666',
-    textAlign: 'center',
+    padding: 20,
   },
   formSection: {
     marginBottom: 20,
   },
   label: {
-    marginBottom: 8,
+    marginBottom: 10,
     fontWeight: '600',
     fontSize: 16,
-    color: '#2c3e50'
+    color: '#2C3E50'
   },
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#2c3e50',
-    marginBottom: 10,
-  },
-  spacing: {
-    height: 8,
-  },
-  spacingLarge: {
-    height: 20,
-  },
-  crdinputWrapper:{ 
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#ffffff',
-    borderRadius: 12,
-    paddingHorizontal: 15,
-    borderWidth: 1,
-    borderColor: '#ddd',
-    height: 90,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 3,
-    elevation: 2,
-  },
+  
+  // Input Wrappers
   inputWrapper: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -628,32 +568,53 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     paddingHorizontal: 15,
     borderWidth: 1,
-    borderColor: '#ddd',
+    borderColor: '#e1e5e9',
     height: 50,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 3,
+    shadowOpacity: 0.08,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  textareaWrapper: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    backgroundColor: '#ffffff',
+    borderRadius: 12,
+    paddingHorizontal: 15,
+    paddingVertical: 12,
+    borderWidth: 1,
+    borderColor: '#e1e5e9',
+    minHeight: 120,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 4,
     elevation: 2,
   },
   inputIcon: {
-    marginRight: 10,
-    
+    marginRight: 12,
+    width: 20,
+  },
+  textareaIcon: {
+    marginRight: 12,
+    marginTop: 4,
+    width: 20,
   },
   dropdown: {
     flex: 1,
-    color: '#000',
   },
   dropdownDisabled: {
     opacity: 0.5,
   },
   placeholderStyle: {
     fontSize: 16,
-    color: '#666',
+    color: '#999',
   },
   selectedTextStyle: {
     fontSize: 16,
-    color: '#000',
+    color: '#2C3E50',
+    fontWeight: '500',
   },
   inputSearchStyle: {
     height: 40,
@@ -663,43 +624,48 @@ const styles = StyleSheet.create({
     position: 'absolute',
     right: 15,
   },
+  
+  // Radio Group
   radioGroup: {
     flexDirection: 'row',
     gap: 12,
   },
   radioOption: {
     flex: 1,
-    padding: 12,
+    padding: 14,
     borderWidth: 1,
-    borderColor: '#ddd',
-    borderRadius: 8,
+    borderColor: '#e1e5e9',
+    borderRadius: 10,
     backgroundColor: '#f8fafc',
     alignItems: 'center',
   },
   radioSelected: {
     backgroundColor: '#e0f2f1',
-    borderColor: '#4ecdc4',
+    borderColor: '#4ECDC4',
   },
   radioText: {
     textAlign: 'center',
     color: '#666',
     fontWeight: '500',
+    fontSize: 14,
   },
   radioTextSelected: {
-    color: '#2c3e50',
+    color: '#2C3E50',
     fontWeight: '600'
   },
+  
+  // Priority Group
   priorityGroup: {
     flexDirection: 'row',
-    gap: 8,
+    gap: 10,
     justifyContent: 'space-between',
   },
   priorityOption: {
     flex: 1,
-    padding: 12,
+    padding: 14,
     borderWidth: 1,
-    borderColor: '#ddd',
-    borderRadius: 8,
+    borderColor: '#e1e5e9',
+    borderRadius: 10,
     backgroundColor: '#f8fafc',
     alignItems: 'center',
   },
@@ -708,8 +674,8 @@ const styles = StyleSheet.create({
     borderColor: '#ff6b6b'
   },
   priorityNormalSelected: {
-    backgroundColor: '#4ecdc4',
-    borderColor: '#4ecdc4'
+    backgroundColor: '#4ECDC4',
+    borderColor: '#4ECDC4'
   },
   priorityLowSelected: {
     backgroundColor: '#ffd166',
@@ -719,78 +685,87 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     fontWeight: '500',
     color: '#666',
+    fontSize: 14,
   },
   priorityTextSelected: {
     color: 'white',
     fontWeight: '600'
   },
-  divider: {
-    height: 1,
-    backgroundColor: '#e0e0e0',
-    marginVertical: 5,
-  },
+  
+  // Textarea
   textarea: {
     flex: 1,
-    color: '#333',
+    color: '#2C3E50',
     fontSize: 16,
-    paddingVertical: 28,
+    lineHeight: 22,
     textAlignVertical: 'top',
-    minHeight: 100,
+    minHeight: 80,
   },
+  
+  // Submit Button
   submitBtn: {
     borderRadius: 12,
     overflow: 'hidden',
-    shadowColor: Colors.primary,
-    shadowOffset: { width: 0, height: 5 },
+    marginTop: 10,
+    shadowColor: '#2C3E50',
+    shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
-    shadowRadius: 10,
-    elevation: 5,
+    shadowRadius: 8,
+    elevation: 6,
   },
   submitBtnGradient: {
     padding: 16,
     alignItems: 'center',
   },
   submitBtnText: {
-    color: Colors.accent,
+    color: 'white',
     fontSize: 18,
     fontWeight: '600'
   },
   
   // Requests History
   requestsHistory: {
-    borderRadius: 20,
+    borderRadius: 16,
     overflow: 'hidden',
+    marginBottom: 20,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.1,
-    shadowRadius: 20,
-    elevation: 10,
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.15,
+    shadowRadius: 16,
+    elevation: 8,
   },
   historyTitle: {
     fontSize: 20,
     marginBottom: 20,
-    color: '#2c3e50',
+    color: '#2C3E50',
     fontWeight: 'bold',
     textAlign: 'center',
   },
   requestCard: {
     borderLeftWidth: 4,
-    borderLeftColor: '#4ecdc4',
+    borderLeftColor: '#4ECDC4',
     padding: 16,
     marginBottom: 12,
     backgroundColor: '#f8fafc',
-    borderRadius: 8,
+    borderRadius: 10,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.05,
     shadowRadius: 3,
     elevation: 2,
   },
+  requestHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    marginBottom: 6,
+  },
   serviceName: {
     fontWeight: '600',
-    color: '#2c3e50',
+    color: '#2C3E50',
     fontSize: 16,
-    marginBottom: 4,
+    flex: 1,
+    marginRight: 10,
   },
   projectName: {
     fontWeight: '500',
@@ -806,37 +781,44 @@ const styles = StyleSheet.create({
   requestContent: {
     lineHeight: 20,
     color: '#555',
-    marginBottom: 8,
+    fontSize: 14,
   },
   statusBadge: {
-    paddingHorizontal: 8,
+    paddingHorizontal: 10,
     paddingVertical: 4,
     borderRadius: 12,
     fontSize: 12,
     fontWeight: '600',
-    alignSelf: 'flex-start',
+    overflow: 'hidden',
   },
   statusPending: {
     backgroundColor: '#ffe66d',
-    color: '#2c3e50'
+    color: '#2C3E50'
   },
   statusInprogress: {
-    backgroundColor: '#4ecdc4',
+    backgroundColor: '#4ECDC4',
     color: 'white'
   },
   statusCompleted: {
     backgroundColor: '#34d399',
     color: 'white'
   },
+  
+  // Notification
   notification: {
-    padding: 15,
-    borderRadius: 8,
+    padding: 16,
+    borderRadius: 10,
     marginBottom: 16,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
+    shadowOffset: { width: 0, height: 3 },
     shadowOpacity: 0.2,
-    shadowRadius: 4,
+    shadowRadius: 5,
     elevation: 5,
+  },
+  notificationText: {
+    color: 'white',
+    fontWeight: '500',
+    textAlign: 'center',
   },
   error: {
     backgroundColor: '#ff6b6b'
@@ -844,22 +826,27 @@ const styles = StyleSheet.create({
   success: {
     backgroundColor: '#34d399'
   },
+  
+  // Empty State
   noRequests: {
     textAlign: 'center',
     color: '#7b8788',
     fontSize: 16,
-    padding: 20,
+    padding: 30,
+    fontStyle: 'italic',
   },
+  
+  // Loader
   loader: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: Colors.dark,
+    backgroundColor: '#F8FAFC',
   },
   loadingText: {
     marginTop: 12,
     fontSize: 16,
-    color: Colors.accent,
+    color: '#2C3E50',
   },
 });
 

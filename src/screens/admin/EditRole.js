@@ -99,6 +99,8 @@ const EditRole = ({ route, navigation }) => {
           <TextInput
             style={styles.input}
             placeholder="Enter role name"
+                          placeholderTextColor={"#bbb8b8ff"}
+
             value={roleName}
             onChangeText={setRoleName}
           />
@@ -188,6 +190,7 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     padding: 15,
     fontSize: 16,
+    color:'black',
   },
   infoBox: {
     flexDirection: 'row',

@@ -25,6 +25,8 @@ const WelcomeScreen = ({ navigation, route }) => {
   const floatAnim2 = useRef(new Animated.Value(0)).current;
   
   const scrollViewRef = useRef();
+  const servicesRef = useRef();
+  const projectsRef = useRef();
   const [sectionPositions, setSectionPositions] = useState({
     services: 0,
     projects: 0
@@ -350,43 +352,51 @@ const WelcomeScreen = ({ navigation, route }) => {
           </View>
         </LinearGradient>
 
-        {/* Projects Section */}
-        <LinearGradient
-          colors={[Colors.dark, Colors.primary]}
-          style={styles.projectsSection}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-        >
-          <View 
-            onLayout={handleProjectsLayout}
-            style={styles.sectionContainer}
+        {/* Projects Section with Background Image */}
+        <View style={styles.projectsSection}>
+          {/* Background Image */}
+          <Image 
+            source={require('../assets/images/arfa.jpg')}
+            style={styles.projectsBackgroundImage}
+            resizeMode="cover"
+          />
+          <LinearGradient
+            colors={['rgba(0, 0, 0, 0.91)', 'rgba(0, 0, 0, 0.81)']}
+            style={styles.projectsOverlay}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
           >
-            <View style={styles.sectionHeader}>
-              <Text style={[styles.sectionTitle, { color: Colors.white }]}>
-                Featured <Text style={styles.sectionTitleHighlight}>Projects</Text>
-              </Text>
-              <Text style={[styles.sectionSubtitle, { color: 'rgba(255,255,255,0.8)' }]}>
-                Discover our portfolio of innovative solutions and successful implementations
-              </Text>
-            </View>
+            <View 
+              onLayout={handleProjectsLayout}
+              style={styles.sectionContainer}
+            >
+              <View style={styles.sectionHeader}>
+                <Text style={[styles.sectionTitle, { color: Colors.white }]}>
+                  Featured <Text style={styles.sectionTitleHighlight}>Projects</Text>
+                </Text>
+                <Text style={[styles.sectionSubtitle, { color: 'rgba(255,255,255,0.8)' }]}>
+                  Discover our portfolio of innovative solutions and successful implementations
+                </Text>
+              </View>
 
-            <View style={styles.projectsGrid}>
-              {projects.map((project, index) => (
-                <TouchableOpacity key={index} style={styles.projectCard} onPress={() => project.url && openUrl(project.url)} activeOpacity={0.9}>
-                  <View style={styles.projectIcon}>
-                    <Text style={styles.projectLetter}>{project.letter}</Text>
-                  </View>
-                  <Text style={styles.projectName}>{project.name}</Text>
-                  <Text style={styles.projectDescription}>{project.description}</Text>
-                  <TouchableOpacity style={styles.projectButton} onPress={() => project.url && openUrl(project.url)}>
-                    <Text style={styles.projectButtonText}>View Project</Text>
-                    <Icon name="external-link" size={12} color={Colors.secondary} />
+              <View style={styles.projectsGrid}>
+                {projects.map((project, index) => (
+                  <TouchableOpacity key={index} style={styles.projectCard} onPress={() => project.url && openUrl(project.url)} activeOpacity={0.9}>
+                    <View style={styles.projectIcon}>
+                      <Text style={styles.projectLetter}>{project.letter}</Text>
+                    </View>
+                    <Text style={styles.projectName}>{project.name}</Text>
+                    <Text style={styles.projectDescription}>{project.description}</Text>
+                    <TouchableOpacity style={styles.projectButton} onPress={() => project.url && openUrl(project.url)}>
+                      <Text style={styles.projectButtonText}>View Project</Text>
+                      <Icon name="external-link" size={12} color={Colors.secondary} />
+                    </TouchableOpacity>
                   </TouchableOpacity>
-                </TouchableOpacity>
-              ))}
+                ))}
+              </View>
             </View>
-          </View>
-        </LinearGradient>
+          </LinearGradient>
+        </View>
 
         {/* Footer - Same as Login Screen */}
         <View style={styles.footer}>
@@ -599,9 +609,22 @@ const styles = StyleSheet.create({
     paddingVertical: 60, 
     paddingHorizontal: 24 
   },
+  // Projects Section with Background Image
   projectsSection: { 
-    paddingVertical: 60, 
-    paddingHorizontal: 24 
+    position: 'relative',
+    minHeight: height * 0.8,
+  },
+  projectsBackgroundImage: {
+    position: 'absolute',
+    width: '190%',
+    height: '120%',
+  },
+  projectsOverlay: {
+    flex: 1,
+    paddingVertical: 60,
+    paddingHorizontal: 24,
+
+    
   },
   sectionContainer: { 
     width: '100%', 

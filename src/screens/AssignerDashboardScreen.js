@@ -110,7 +110,7 @@ const AssignerDashboardScreen = () => {
           style={styles.viewBtn}
           onPress={() => navigation.navigate('RequestDetail', { requestId: item.id })}
         >
-          <LinearGradient colors={[Colors.primary, Colors.secondary]} style={styles.viewBtnGradient}>
+          <LinearGradient colors={['#2C3E50', '#4ECDC4']} style={styles.viewBtnGradient}>
             <Text style={styles.viewBtnText}>View</Text>
           </LinearGradient>
         </TouchableOpacity>
@@ -128,7 +128,7 @@ const AssignerDashboardScreen = () => {
         }
       </Text>
       <TouchableOpacity style={styles.refreshButton} onPress={fetchRequests}>
-        <LinearGradient colors={[Colors.primary, Colors.secondary]} style={styles.refreshButtonGradient}>
+        <LinearGradient colors={['#2C3E50', '#4ECDC4']} style={styles.refreshButtonGradient}>
           <Text style={styles.refreshButtonText}>Refresh</Text>
         </LinearGradient>
       </TouchableOpacity>
@@ -139,146 +139,132 @@ const AssignerDashboardScreen = () => {
     <View style={styles.container}>
       <StatusBar barStyle="light-content" translucent backgroundColor="transparent" />
       
-      {/* Navbar */}
-      <View style={styles.navbar}>
-        <View style={styles.navbarContent}>
-          {/* Logo Container on Left Side */}
-          <LinearGradient colors={[Colors.primary, Colors.secondary]} style={styles.logoContainer}>
-            <Text style={styles.navbarTitle}>Assignment Dashboard</Text>
-          </LinearGradient>
-
-          {/* Action Buttons on Right Side */}
-          <View style={styles.actionButtons}>
-             <TouchableOpacity style={styles.logoutBtn} onPress={handleLogout}>
-              <LinearGradient colors={['#EF4444', '#DC2626']} style={styles.logoutBtnGradient}>
-                <Text style={styles.logoutBtnText}>Logout</Text>
-              </LinearGradient>
-            </TouchableOpacity>
+      {/* Header - Matching Admin Dashboard */}
+      <LinearGradient
+        colors={['#2C3E50', '#4ECDC4']}
+        style={styles.header}
+      >
+        <View style={styles.headerContent}>
+          <View style={styles.headerText}>
+            <Text style={styles.welcomeText}>
+              Welcome, {user?.name || 'Assigner'}
+            </Text>
+            <Text style={styles.roleText}>Assigner Dashboard</Text>
           </View>
+          <TouchableOpacity onPress={handleLogout} style={styles.logoutBtn}>
+            <Icon name="sign-out" size={20} color="#fff" />
+          </TouchableOpacity>
         </View>
-      </View>
+      </LinearGradient>
 
       {/* Main Content */}
-      <LinearGradient colors={[Colors.dark, Colors.primary, Colors.dark]} style={styles.background}>
-        <ScrollView contentContainerStyle={styles.scrollContent}>
-          {error && (
-            <Animatable.View animation="fadeIn" style={styles.errorContainer}>
-              <Text style={styles.errorText}>{error}</Text>
-              <TouchableOpacity style={styles.retryButton} onPress={retryFetch}>
-                <LinearGradient colors={[Colors.primary, Colors.secondary]} style={styles.retryButtonGradient}>
-                  <Text style={styles.retryText}>Retry</Text>
+      <ScrollView contentContainerStyle={styles.scrollContent}>
+        {error && (
+          <Animatable.View animation="fadeIn" style={styles.errorContainer}>
+            <Text style={styles.errorText}>{error}</Text>
+            <TouchableOpacity style={styles.retryButton} onPress={retryFetch}>
+              <LinearGradient colors={['#2C3E50', '#4ECDC4']} style={styles.retryButtonGradient}>
+                <Text style={styles.retryText}>Retry</Text>
+              </LinearGradient>
+            </TouchableOpacity>
+          </Animatable.View>
+        )}
+
+        {/* Stats Section */}
+        <Animatable.View animation="fadeInDown" duration={800} style={styles.statsContainer}>
+          <ScrollView 
+            horizontal 
+            showsHorizontalScrollIndicator={false} 
+            contentContainerStyle={styles.statsScrollContent}
+          >
+            {Object.entries(stats).map(([key, value]) => (
+              <Animatable.View 
+                key={key} 
+                animation="zoomIn" 
+                duration={600}
+                delay={key === 'total' ? 200 : key === 'pending' ? 300 : key === 'inProgress' ? 400 : 500}
+                style={styles.statCard}
+              >
+                <LinearGradient colors={['#ffffff', '#f8f9fa', '#ffffff']} style={styles.statCardGradient}>
+                  <Text style={[styles.statValue, { color: statColors[key] }]}>
+                    {value}
+                  </Text>
+                  <Text style={styles.statLabel}>
+                    {key === 'total' ? 'Total Requests' : 
+                     key === 'pending' ? 'Pending' : 
+                     key === 'inProgress' ? 'In Progress' : 'Completed'}
+                  </Text>
                 </LinearGradient>
-              </TouchableOpacity>
-            </Animatable.View>
-          )}
+              </Animatable.View>
+            ))}
+          </ScrollView>
+        </Animatable.View>
 
-          {/* Super Admin Section */}
-          <View style={styles.superAdminSection}>
-            <Text style={styles.superAdminTitle}>Assigner Dashboard</Text>
-            <Text style={styles.superAdminEmail}>{user?.email || 'assigner@example.com'}</Text>
-            
-            {/* Logout Button on Left Side */}
-             
+        {/* Search and Filter Section */}
+        <Animatable.View animation="fadeInUp" duration={800} delay={200} style={styles.searchFilterContainer}>
+          <View style={styles.searchWrapper}>
+            <Icon name="search" size={16} color="#4ECDC4" style={styles.searchIcon} />
+            <TextInput
+              placeholder="Search requests..."
+              value={search}
+              onChangeText={setSearch}
+              style={styles.searchInput}
+              placeholderTextColor="#666"
+            />
           </View>
-
-          <View style={styles.divider} />
           
-          {/* Stats Section */}
-          <Animatable.View animation="fadeInDown" duration={800} style={styles.statsContainer}>
-            <ScrollView 
-              horizontal 
-              showsHorizontalScrollIndicator={false} 
-              contentContainerStyle={styles.statsScrollContent}
-            >
-              {Object.entries(stats).map(([key, value]) => (
-                <Animatable.View 
-                  key={key} 
-                  animation="zoomIn" 
-                  duration={600}
-                  delay={key === 'total' ? 200 : key === 'pending' ? 300 : key === 'inProgress' ? 400 : 500}
-                  style={styles.statCard}
+          <ScrollView 
+            horizontal 
+            showsHorizontalScrollIndicator={false}
+            style={styles.filterScroll}
+          >
+            <View style={styles.filterContainer}>
+              {['all', 'pending', 'inprogress', 'completed'].map(f => (
+                <TouchableOpacity
+                  key={f}
+                  onPress={() => setFilter(f)}
+                  style={[
+                    styles.filterBtn, 
+                    filter === f && styles.filterBtnActive
+                  ]}
                 >
-                  <LinearGradient colors={['#ffffff', '#f8f9fa', '#ffffff']} style={styles.statCardGradient}>
-                    <Text style={[styles.statValue, { color: statColors[key] }]}>
-                      {value}
-                    </Text>
-                    <Text style={styles.statLabel}>
-                      {key === 'total' ? 'Total Requests' : 
-                       key === 'pending' ? 'Pending' : 
-                       key === 'inProgress' ? 'In Progress' : 'Completed'}
-                    </Text>
-                  </LinearGradient>
-                </Animatable.View>
+                  <Text style={[
+                    styles.filterText,
+                    filter === f && styles.filterTextActive
+                  ]}>
+                    {f === 'all' ? 'All Requests' : 
+                     f === 'inprogress' ? 'In Progress' : 
+                     f.charAt(0).toUpperCase() + f.slice(1)}
+                  </Text>
+                </TouchableOpacity>
               ))}
-            </ScrollView>
-          </Animatable.View>
-
-          {/* Search and Filter Section */}
-          <Animatable.View animation="fadeInUp" duration={800} delay={200} style={styles.searchFilterContainer}>
-            <View style={styles.searchWrapper}>
-              <Icon name="search" size={16} color={Colors.secondary} style={styles.searchIcon} />
-              <TextInput
-                placeholder="Search requests..."
-                value={search}
-                onChangeText={setSearch}
-                style={styles.searchInput}
-                placeholderTextColor="#666"
-              />
             </View>
-            
-            <ScrollView 
-              horizontal 
-              showsHorizontalScrollIndicator={false}
-              style={styles.filterScroll}
-            >
-              <View style={styles.filterContainer}>
-                {['all', 'pending', 'inprogress', 'completed'].map(f => (
-                  <TouchableOpacity
-                    key={f}
-                    onPress={() => setFilter(f)}
-                    style={[
-                      styles.filterBtn, 
-                      filter === f && styles.filterBtnActive
-                    ]}
-                  >
-                    <Text style={[
-                      styles.filterText,
-                      filter === f && styles.filterTextActive
-                    ]}>
-                      {f === 'all' ? 'All Requests' : 
-                       f === 'inprogress' ? 'In Progress' : 
-                       f.charAt(0).toUpperCase() + f.slice(1)}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
-            </ScrollView>
-          </Animatable.View>
+          </ScrollView>
+        </Animatable.View>
 
-          {/* Content Area */}
-          <View style={styles.contentContainer}>
-            {loading ? (
-              <View style={styles.loadingContainer}>
-                <ActivityIndicator size="large" color={Colors.accent} />
-                <Text style={styles.loadingText}>Loading requests...</Text>
-              </View>
-            ) : (
-              <FlatList
-                data={filteredRequests}
-                keyExtractor={item => item.id.toString()}
-                renderItem={renderRequest}
-                ListEmptyComponent={EmptyState}
-                contentContainerStyle={[
-                  styles.listContent,
-                  filteredRequests.length === 0 && styles.emptyListContent
-                ]}
-                scrollEnabled={false}
-                showsVerticalScrollIndicator={false}
-              />
-            )}
-          </View>
-        </ScrollView>
-      </LinearGradient>
+        {/* Content Area */}
+        <View style={styles.contentContainer}>
+          {loading ? (
+            <View style={styles.loadingContainer}>
+              <ActivityIndicator size="large" color="#2C3E50" />
+              <Text style={styles.loadingText}>Loading requests...</Text>
+            </View>
+          ) : (
+            <FlatList
+              data={filteredRequests}
+              keyExtractor={item => item.id.toString()}
+              renderItem={renderRequest}
+              ListEmptyComponent={EmptyState}
+              contentContainerStyle={[
+                styles.listContent,
+                filteredRequests.length === 0 && styles.emptyListContent
+              ]}
+              scrollEnabled={false}
+              showsVerticalScrollIndicator={false}
+            />
+          )}
+        </View>
+      </ScrollView>
     </View>
   );
 };
@@ -305,109 +291,45 @@ const priorityColors = {
 const styles = StyleSheet.create({
   container: { 
     flex: 1,
-  },
-  background: { 
-    flex: 1,
+    backgroundColor: '#F8FAFC',
   },
   scrollContent: {
     flexGrow: 1,
-    padding: 16,
+    padding: 20,
+    paddingTop: 10,
   },
   
-  // Navbar Styles
-  navbar: {
-    backgroundColor: Colors.white, 
-    borderBottomWidth: 1, 
-    borderBottomColor: '#e0e0e0', 
-    paddingHorizontal: 16,
-    paddingTop: 50,
-    paddingBottom: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 3,
-    elevation: 3,
-  },
-  navbarContent: {
-    flexDirection: 'row', 
-    justifyContent: 'space-between', 
-    alignItems: 'center',
-  },
-  logoContainer: {
+  // Header - Matching Admin Dashboard
+  header: {
     paddingHorizontal: 20,
-    paddingVertical: 10,
-    borderRadius: 8,
+    paddingTop: 60,
+    paddingBottom: 30,
+    borderBottomLeftRadius: 30,
+    borderBottomRightRadius: 30,
   },
-  navbarTitle: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: 'white',
-  },
-  actionButtons: {
+  headerContent: {
     flexDirection: 'row',
-    gap: 10,
-  },
-  viewHistoryBtn: {
-    borderRadius: 8,
-    overflow: 'hidden',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 3,
-    elevation: 2,
-  },
-  btnGradient: {
-    paddingHorizontal: 16,
-    paddingVertical: 10,
+    justifyContent: 'space-between',
     alignItems: 'center',
   },
-  btnText: {
-    color: Colors.accent,
-    fontWeight: '600',
-    fontSize: 14,
+  headerText: {
+    flex: 1,
   },
-  
-  // Super Admin Section
-  superAdminSection: {
-    marginBottom: 7,
-    padding: 16,
-  },
-  superAdminTitle: {
-    fontSize: 35,
+  welcomeText: {
+    fontSize: 24,
     fontWeight: 'bold',
-    color: Colors.accent,
-    marginBottom: 4,
+    color: '#fff',
+    marginBottom: 5,
   },
-  superAdminEmail: {
+  roleText: {
     fontSize: 16,
-    color: Colors.accent,
-    opacity: 0.8,
-    marginBottom: 16,
+    color: '#fff',
+    opacity: 0.9,
   },
   logoutBtn: {
-    borderRadius: 8,
-    overflow: 'hidden',
-    alignSelf: 'flex-start',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 3,
-    elevation: 2,
-  },
-  logoutBtnGradient: {
-    paddingHorizontal: 20,
-    paddingVertical: 12,
-    alignItems: 'center',
-  },
-  logoutBtnText: {
-    color: 'white',
-    fontWeight: '600',
-    fontSize: 14,
-  },
-  divider: {
-    height: 1,
-    backgroundColor: 'rgba(255, 255, 255, 0.3)',
-    marginBottom: 20,
+    padding: 10,
+    borderRadius: 10,
+    backgroundColor: 'rgba(255,255,255,0.2)',
   },
   
   // Stats Section
@@ -427,6 +349,7 @@ const styles = StyleSheet.create({
     shadowRadius: 20,
     elevation: 10,
     minWidth: width * 0.4,
+    marginBottom:10,
   },
   statCardGradient: {
     paddingVertical: 25,
@@ -448,7 +371,7 @@ const styles = StyleSheet.create({
   
   // Search and Filter Section
   searchFilterContainer: {
-    marginBottom: 20,
+    marginBottom: 28,
   },
   searchWrapper: {
     flexDirection: 'row',
@@ -498,8 +421,8 @@ const styles = StyleSheet.create({
     elevation: 2,
   },
   filterBtnActive: { 
-    backgroundColor: Colors.primary, 
-    borderColor: Colors.primary,
+    backgroundColor: '#4ECDC4', 
+    borderColor: '#4ECDC4',
   },
   filterText: {
     fontSize: 14,
@@ -523,7 +446,7 @@ const styles = StyleSheet.create({
   loadingText: {
     marginTop: 12,
     fontSize: 16,
-    color: Colors.accent,
+    color: '#2C3E50',
   },
   listContent: {
     paddingBottom: 20,
@@ -556,7 +479,7 @@ const styles = StyleSheet.create({
   projectName: { 
     fontSize: 18, 
     fontWeight: '700',
-    color: '#2a5298',
+    color: '#2C3E50',
     flex: 1,
   },
   userName: { 
@@ -597,7 +520,7 @@ const styles = StyleSheet.create({
   viewBtn: {
     borderRadius: 12,
     overflow: 'hidden',
-    shadowColor: Colors.primary,
+    shadowColor: '#2C3E50',
     shadowOffset: { width: 0, height: 5 },
     shadowOpacity: 0.3,
     shadowRadius: 10,
@@ -608,7 +531,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   viewBtnText: {
-    color: Colors.accent,
+    color: 'white',
     fontSize: 16,
     fontWeight: '600',
   },
@@ -623,7 +546,7 @@ const styles = StyleSheet.create({
   emptyStateTitle: {
     fontSize: 20,
     fontWeight: '700',
-    color: '#2a5298',
+    color: '#2C3E50',
     marginBottom: 8,
     textAlign: 'center',
   },
@@ -637,7 +560,7 @@ const styles = StyleSheet.create({
   refreshButton: {
     borderRadius: 12,
     overflow: 'hidden',
-    shadowColor: Colors.primary,
+    shadowColor: '#2C3E50',
     shadowOffset: { width: 0, height: 5 },
     shadowOpacity: 0.3,
     shadowRadius: 10,
@@ -649,7 +572,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   refreshButtonText: {
-    color: Colors.accent,
+    color: 'white',
     fontWeight: '600',
     fontSize: 16,
   },
@@ -684,7 +607,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   retryText: { 
-    color: Colors.accent, 
+    color: 'white', 
     fontWeight: '600',
   },
 });

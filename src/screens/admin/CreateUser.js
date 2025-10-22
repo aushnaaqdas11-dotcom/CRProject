@@ -152,6 +152,8 @@ const CreateUser = ({ navigation }) => {
             <TextInput
               style={styles.input}
               placeholder="Enter full name"
+                            placeholderTextColor={"#bbb8b8ff"}
+
               value={formData.name}
               onChangeText={(text) => handleInputChange('name', text)}
               returnKeyType="next"
@@ -164,6 +166,8 @@ const CreateUser = ({ navigation }) => {
               style={styles.input}
               placeholder="Enter email address"
               keyboardType="email-address"
+                            placeholderTextColor={"#bbb8b8ff"}
+
               autoCapitalize="none"
               value={formData.email}
               onChangeText={(text) => handleInputChange('email', text)}
@@ -177,6 +181,8 @@ const CreateUser = ({ navigation }) => {
               style={styles.input}
               placeholder="Enter CNIC"
               value={formData.cnic}
+                            placeholderTextColor={"#bbb8b8ff"}
+
               onChangeText={(text) => handleInputChange('cnic', text)}
               returnKeyType="next"
             />
@@ -189,6 +195,8 @@ const CreateUser = ({ navigation }) => {
               placeholder="Enter phone number"
               keyboardType="phone-pad"
               value={formData.phone}
+                            placeholderTextColor={"#bbb8b8ff"}
+
               onChangeText={(text) => handleInputChange('phone', text)}
               returnKeyType="next"
             />
@@ -223,6 +231,8 @@ const CreateUser = ({ navigation }) => {
               style={styles.input}
               placeholder="Enter password"
               secureTextEntry
+                            placeholderTextColor={"#bbb8b8ff"}
+
               value={formData.password}
               onChangeText={(text) => handleInputChange('password', text)}
               returnKeyType="next"
@@ -238,6 +248,8 @@ const CreateUser = ({ navigation }) => {
               value={formData.confirmPassword}
               onChangeText={(text) => handleInputChange('confirmPassword', text)}
               returnKeyType="done"
+                            placeholderTextColor={"#bbb8b8ff"}
+
               onSubmitEditing={handleSubmit}
             />
           </View>
@@ -315,6 +327,7 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     padding: 15,
     fontSize: 16,
+    color:'black',
   },
   roleContainer: {
     flexDirection: 'row',

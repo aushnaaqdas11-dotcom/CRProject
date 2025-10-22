@@ -1,7 +1,7 @@
 // services/apiService.js
 import axios from 'axios';
 
-const BASE_URL = 'http://10.50.206.72:8000/api';
+const BASE_URL = 'http://10.50.206.199:8000/api';
 
 const apiService = axios.create({
   baseURL: BASE_URL,
@@ -128,7 +128,7 @@ export default {
   },
 
   async getSubQueries(queryId) {
-    return apiService.get(`/subqueries/${queryId}`);
+    return apiService.get(`/sub-queries/${queryId}`);
   },
 
   async getRecentRequests() {

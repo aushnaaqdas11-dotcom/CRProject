@@ -18,8 +18,10 @@ class UserRequest extends Model
         'priority',
         'request_details',
         'status',
-        'sub_query',
+        'sub_query', // Make sure this is included
         'source',
+        'assigned_to',
+        'assigner_comment',
     ];
 
     // Relations

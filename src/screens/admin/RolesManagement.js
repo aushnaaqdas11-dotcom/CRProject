@@ -228,6 +228,8 @@ const RolesManagement = ({ navigation }) => {
               style={styles.modalInput}
               placeholder="Enter role name"
               value={newRoleName}
+                            placeholderTextColor={"#bbb8b8ff"}
+
               onChangeText={setNewRoleName}
             />
 

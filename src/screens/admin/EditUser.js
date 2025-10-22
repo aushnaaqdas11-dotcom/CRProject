@@ -190,6 +190,8 @@ const EditUser = ({ route, navigation }) => {
               style={styles.input}
               placeholder="Enter full name"
               value={formData.name}
+                            placeholderTextColor={"#bbb8b8ff"}
+
               onChangeText={(text) => handleInputChange('name', text)}
               returnKeyType="next"
             />
@@ -202,6 +204,8 @@ const EditUser = ({ route, navigation }) => {
               placeholder="Enter email address"
               keyboardType="email-address"
               autoCapitalize="none"
+                            placeholderTextColor={"#bbb8b8ff"}
+
               value={formData.email}
               onChangeText={(text) => handleInputChange('email', text)}
               returnKeyType="next"
@@ -212,6 +216,8 @@ const EditUser = ({ route, navigation }) => {
             <Text style={styles.label}>CNIC</Text>
             <TextInput
               style={styles.input}
+                            placeholderTextColor={"#bbb8b8ff"}
+
               placeholder="Enter CNIC"
               value={formData.cnic}
               onChangeText={(text) => handleInputChange('cnic', text)}
@@ -225,6 +231,8 @@ const EditUser = ({ route, navigation }) => {
               style={styles.input}
               placeholder="Enter phone number"
               keyboardType="phone-pad"
+                            placeholderTextColor={"#bbb8b8ff"}
+
               value={formData.phone}
               onChangeText={(text) => handleInputChange('phone', text)}
               returnKeyType="next"
@@ -259,6 +267,7 @@ const EditUser = ({ route, navigation }) => {
             <TextInput
               style={styles.input}
               placeholder="Enter new password"
+              placeholderTextColor={"#bbb8b8ff"}
               secureTextEntry
               value={formData.password}
               onChangeText={(text) => handleInputChange('password', text)}
@@ -273,6 +282,8 @@ const EditUser = ({ route, navigation }) => {
               placeholder="Confirm new password"
               secureTextEntry
               value={formData.confirmPassword}
+                            placeholderTextColor={"#bbb8b8ff"}
+
               onChangeText={(text) => handleInputChange('confirmPassword', text)}
               returnKeyType="done"
               onSubmitEditing={handleSubmit}
@@ -363,6 +374,8 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     padding: 15,
     fontSize: 16,
+    color:'black',
+
   },
   roleContainer: {
     flexDirection: 'row',
