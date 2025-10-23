@@ -1,3 +1,4 @@
+// navigation/AppNavigator.js
 import React from 'react';
 import { NavigationContainer } from '@react-navigation/native';
 import { createStackNavigator } from '@react-navigation/stack';
@@ -7,10 +8,11 @@ import LoginScreen from '../screens/LoginScreen';
 import UserDashboard from '../screens/UserDashboard';
 import AdminDashboard from '../screens/AdminDashboard';
 import ResolverDashboard from '../screens/ResolverDashboard';
+import ResolverRequestDetail from '../screens/ResolverRequestDetail'; // NEW
 import AssignerDashboardScreen from '../screens/AssignerDashboardScreen';
 import RequestDetailScreen from '../screens/RequestDetailScreen';
 import UserHistoryScreen from '../screens/UserHistoryScreen';
-
+ 
 // Admin Screens
 import ManageUsers from '../screens/admin/ManageUsers';
 import RolesManagement from '../screens/admin/RolesManagement';
@@ -47,8 +49,11 @@ const AppNavigator = () => {
         <Stack.Screen name="EditUser" component={EditUser} />
         <Stack.Screen name="EditRole" component={EditRole} />
         
-        {/* Other Role Screens */}
+        {/* Resolver Screens - NEW */}
         <Stack.Screen name="ResolverDashboard" component={ResolverDashboard} />
+        <Stack.Screen name="ResolverRequestDetail" component={ResolverRequestDetail} />
+        
+        {/* Other Role Screens */}
         <Stack.Screen name="AssignerDashboard" component={AssignerDashboardScreen} />
       </Stack.Navigator>
     </NavigationContainer>

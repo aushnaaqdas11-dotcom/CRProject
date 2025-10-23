@@ -1,42 +1,39 @@
-import React, { useState, useEffect } from 'react';
+// screens/ResolverDashboard.js
+import React, { useState, useEffect, useContext } from 'react';
 import {
   View,
   Text,
-  ScrollView,
   StyleSheet,
+  ScrollView,
   TouchableOpacity,
-  Alert,
+  ActivityIndicator,
   RefreshControl,
-  ActivityIndicator
+  Alert,
+  FlatList,
 } from 'react-native';
+import { useAuth } from '../context/AuthContext';
+import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import LinearGradient from 'react-native-linear-gradient';
-import Icon from 'react-native-vector-icons/FontAwesome';
-import { Colors } from '../styles/theme';
-import { resolverAPI } from '../services/apiService';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+
 
 const ResolverDashboard = ({ navigation }) => {
+  const { user, userApi } = useAuth();
   const [dashboardData, setDashboardData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [user, setUser] = useState(null);
 
-  const loadDashboard = async () => {
+  const fetchDashboardData = async () => {
     try {
-      const userData = await AsyncStorage.getItem('userData');
-      if (userData) {
-        setUser(JSON.parse(userData));
-      }
-
-      const response = await resolverAPI.getDashboard();
+      setLoading(true);
+      const response = await userApi.resolver.getDashboard();
       if (response.data.success) {
         setDashboardData(response.data.data);
       } else {
-        Alert.alert('Error', 'Failed to load dashboard data');
+        Alert.alert('Error', response.data.message || 'Failed to load dashboard');
       }
     } catch (error) {
-      console.log('Resolver dashboard error:', error);
-      Alert.alert('Error', 'Failed to load resolver dashboard');
+      console.log('Dashboard error:', error);
+      Alert.alert('Error', 'Failed to load dashboard data');
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -45,260 +42,349 @@ const ResolverDashboard = ({ navigation }) => {
 
   const onRefresh = () => {
     setRefreshing(true);
-    loadDashboard();
+    fetchDashboardData();
   };
 
   useEffect(() => {
-    loadDashboard();
+    fetchDashboardData();
   }, []);
 
-  const handleLogout = async () => {
-    try {
-      await AsyncStorage.removeItem('userToken');
-      await AsyncStorage.removeItem('userData');
-      navigation.navigate('Login');
-    } catch (error) {
-      console.log('Logout error:', error);
-    }
-  };
+  const StatCard = ({ title, value, icon, color }) => (
+    <View style={[styles.statCard, { borderLeftColor: color }]}>
+      <View style={styles.statContent}>
+        <Text style={styles.statValue}>{value}</Text>
+        <Text style={styles.statTitle}>{title}</Text>
+      </View>
+      <Icon name={icon} size={30} color={color} style={styles.statIcon} />
+    </View>
+  );
 
-  const handleUpdateStatus = (requestId) => {
-    Alert.alert(
-      'Update Status',
-      'This feature will be implemented in the next update',
-      [{ text: 'OK' }]
-    );
-  };
+  const RequestItem = ({ request }) => (
+    <TouchableOpacity 
+      style={styles.requestItem}
+      onPress={() => navigation.navigate('ResolverRequestDetail', { requestId: request.id })}
+    >
+      <View style={styles.requestHeader}>
+        <Text style={styles.requestId}>#{request.id}</Text>
+        <View style={[styles.statusBadge, styles[`status${request.status.charAt(0).toUpperCase() + request.status.slice(1)}`]]}>
+          <Text style={styles.statusText}>{request.status}</Text>
+        </View>
+      </View>
+      
+      <Text style={styles.userName}>
+        <Icon name="account" size={16} color="#666" /> {request.user.name}
+      </Text>
+      
+      <Text style={styles.serviceText}>{request.service.name}</Text>
+      
+      <View style={styles.requestFooter}>
+        <View style={[styles.priorityBadge, styles[`priority${request.priority.charAt(0).toUpperCase() + request.priority.slice(1)}`]]}>
+          <Text style={styles.priorityText}>{request.priority}</Text>
+        </View>
+        <Text style={styles.dateText}>{request.created_formatted}</Text>
+      </View>
+    </TouchableOpacity>
+  );
 
   if (loading) {
     return (
-      <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color={Colors.primary} />
-        <Text style={styles.loadingText}>Loading Resolver Dashboard...</Text>
+      <View style={styles.centerContainer}>
+        <ActivityIndicator size="large" color="#4ECDC4" />
+        <Text style={styles.loadingText}>Loading Dashboard...</Text>
       </View>
     );
   }
 
   return (
     <View style={styles.container}>
+       <LinearGradient
+              colors={['#2C3E50', '#4ECDC4']}
+              style={styles.header}
+            >
+      {/* Header */}
+      <View style={styles.header}>
+        <View>
+          <Text style={styles.headerTitle}>
+            <Icon name="account-tie" size={24} color="white" /> Resolver Dashboard
+          </Text>
+          <Text style={styles.headerSubtitle}>Manage your assigned requests efficiently</Text>
+        </View>
+        <TouchableOpacity style={styles.logoutButton}>
+          <Icon name="logout" size={20} color="white" />
+        </TouchableOpacity>
+      </View>
+      </LinearGradient>
+
       <ScrollView 
+        style={styles.content}
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
         }
       >
-        {/* Header */}
-        <LinearGradient
-          colors={[Colors.primary, Colors.secondary]}
-          style={styles.header}
-        >
-          <Text style={styles.welcomeText}>
-            Welcome, {user?.name || 'Resolver'}
-          </Text>
-          <Text style={styles.roleText}>Resolver Dashboard</Text>
-        </LinearGradient>
+        {/* Statistics Grid */}
+        {dashboardData && (
+          <>
+            <View style={styles.statsGrid}>
+              <StatCard 
+                title="Total Requests" 
+                value={dashboardData.stats.total} 
+                icon="inbox" 
+                color="#2C3E50" 
+              />
+              <StatCard 
+                title="Pending" 
+                value={dashboardData.stats.pending} 
+                icon="clock" 
+                color="#F59E0B" 
+              />
+              <StatCard 
+                title="In Progress" 
+                value={dashboardData.stats.in_progress} 
+                icon="sync" 
+                color="#3B82F6" 
+              />
+              <StatCard 
+                title="Completed" 
+                value={dashboardData.stats.completed} 
+                icon="check-circle" 
+                color="#10B981" 
+              />
+            </View>
 
-        {/* Stats Cards */}
-        <View style={styles.statsContainer}>
-          <View style={styles.statCard}>
-            <Text style={styles.statNumber}>{dashboardData?.stats?.total || 0}</Text>
-            <Text style={styles.statLabel}>Total Requests</Text>
-          </View>
-          <View style={styles.statCard}>
-            <Text style={styles.statNumber}>{dashboardData?.stats?.pending || 0}</Text>
-            <Text style={styles.statLabel}>Pending</Text>
-          </View>
-          <View style={styles.statCard}>
-            <Text style={styles.statNumber}>{dashboardData?.stats?.in_progress || 0}</Text>
-            <Text style={styles.statLabel}>In Progress</Text>
-          </View>
-          <View style={styles.statCard}>
-            <Text style={styles.statNumber}>{dashboardData?.stats?.completed || 0}</Text>
-            <Text style={styles.statLabel}>Completed</Text>
-          </View>
-        </View>
+            {/* Requests List */}
+            <View style={styles.section}>
+              <View style={styles.sectionHeader}>
+                <Text style={styles.sectionTitle}>
+                  <Icon name="format-list-bulleted" size={20} color="#2C3E50" /> Your Assigned Requests
+                </Text>
+              </View>
 
-        {/* Assigned Requests */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Assigned Requests</Text>
-          {dashboardData?.requests && dashboardData.requests.length > 0 ? (
-            dashboardData.requests.map((request) => (
-              <TouchableOpacity 
-                key={request.id} 
-                style={styles.requestCard}
-                onPress={() => handleUpdateStatus(request.id)}
-              >
-                <Text style={styles.requestTitle}>{request.project?.name || 'No Project'}</Text>
-                <Text style={styles.requestUser}>By: {request.user?.name || 'Unknown User'}</Text>
-                <Text style={styles.requestDetails}>{request.request_details}</Text>
-                <View style={[
-                  styles.statusBadge,
-                  { backgroundColor: getStatusColor(request.status) }
-                ]}>
-                  <Text style={styles.statusText}>
-                    {request.status?.toUpperCase() || 'PENDING'}
+              {dashboardData.assigned_requests.length === 0 ? (
+                <View style={styles.emptyState}>
+                  <Icon name="inbox" size={50} color="#CBD5E1" />
+                  <Text style={styles.emptyStateTitle}>No requests found!</Text>
+                  <Text style={styles.emptyStateText}>
+                    There are no requests assigned to you at the moment.
                   </Text>
                 </View>
-              </TouchableOpacity>
-            ))
-          ) : (
-            <Text style={styles.noDataText}>No assigned requests</Text>
-          )}
-        </View>
+              ) : (
+                <FlatList
+                  data={dashboardData.assigned_requests}
+                  renderItem={({ item }) => <RequestItem request={item} />}
+                  keyExtractor={item => item.id.toString()}
+                  scrollEnabled={false}
+                />
+              )}
+            </View>
+          </>
+        )}
       </ScrollView>
-
-      {/* Logout Button */}
-      <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
-        <LinearGradient
-          colors={[Colors.primary, Colors.secondary]}
-          style={styles.logoutGradient}
-        >
-          <Icon name="sign-out" size={20} color={Colors.accent} />
-          <Text style={styles.logoutText}>Logout</Text>
-        </LinearGradient>
-      </TouchableOpacity>
     </View>
   );
 };
 
-const getStatusColor = (status) => {
-  switch (status?.toLowerCase()) {
-    case 'completed': return '#2ed573';
-    case 'inprogress': return '#ffa502';
-    case 'pending': return '#ff4757';
-    default: return '#747d8c';
-  }
-};
-
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#f8f9fa' },
-  loadingContainer: { 
-    flex: 1, 
-    justifyContent: 'center', 
+  container: {
+    flex: 1,
+    backgroundColor: '#F8FAFC',
+  },
+  centerContainer: {
+    flex: 1,
+    justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#f8f9fa',
+    backgroundColor: '#F8FAFC',
   },
   loadingText: {
     marginTop: 10,
-    color: Colors.primary,
-    fontSize: 16,
+    color: '#64748B',
   },
   header: {
-    padding: 20,
-    paddingTop: 60,
-    paddingBottom: 30,
+    
+   paddingHorizontal: 10,
+    paddingTop: 20,
+    paddingBottom: 10,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    borderBottomLeftRadius: 20,
+    borderBottomRightRadius: 20,
   },
-  welcomeText: {
+  headerTitle: {
     fontSize: 24,
     fontWeight: 'bold',
-    color: Colors.accent,
+    color: 'white',
     marginBottom: 5,
   },
-  roleText: {
+  headerSubtitle: {
     fontSize: 16,
-    color: Colors.accent,
-    opacity: 0.8,
+    color: 'rgba(255,255,255,0.8)',
   },
-  statsContainer: {
+  logoutButton: {
+    padding: 10,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.5)',
+    borderRadius: 8,
+    margin:30,
+  },
+  content: {
+    flex: 1,
+    padding: 15,
+  },
+  statsGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    padding: 15,
-    marginTop: -30,
     justifyContent: 'space-between',
+    marginBottom: 20,
   },
   statCard: {
-    width: '48%',
-    backgroundColor: Colors.accent,
-    marginBottom: 10,
+    backgroundColor: 'white',
+    borderRadius: 16,
     padding: 15,
-    borderRadius: 10,
+    marginBottom: 15,
+    flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'space-between',
+    borderLeftWidth: 4,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
-    shadowRadius: 3,
+    shadowRadius: 8,
     elevation: 3,
+    width: '48%',
   },
-  statNumber: {
+  statContent: {
+    flex: 1,
+  },
+  statValue: {
     fontSize: 24,
     fontWeight: 'bold',
-    color: Colors.primary,
+    color: '#1A252F',
+    marginBottom: 5,
   },
-  statLabel: {
-    fontSize: 12,
-    color: Colors.primary,
-    marginTop: 5,
-    textAlign: 'center',
+  statTitle: {
+    fontSize: 14,
+    color: '#64748B',
+  },
+  statIcon: {
+    opacity: 0.3,
   },
   section: {
+    backgroundColor: 'white',
+    borderRadius: 16,
     padding: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 3,
+  },
+  sectionHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 15,
   },
   sectionTitle: {
     fontSize: 18,
-    fontWeight: 'bold',
-    color: Colors.dark,
-    marginBottom: 15,
+    fontWeight: '600',
+    color: '#2C3E50',
   },
-  requestCard: {
-    backgroundColor: Colors.accent,
+  requestItem: {
+    backgroundColor: '#F8FAFC',
+    borderRadius: 12,
     padding: 15,
-    borderRadius: 10,
     marginBottom: 10,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
-    elevation: 2,
+    borderLeftWidth: 4,
+    borderLeftColor: '#4ECDC4',
   },
-  requestTitle: {
+  requestHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  requestId: {
     fontSize: 16,
     fontWeight: 'bold',
-    color: Colors.dark,
-    marginBottom: 5,
-  },
-  requestUser: {
-    fontSize: 14,
-    color: '#666',
-    marginBottom: 5,
-  },
-  requestDetails: {
-    fontSize: 14,
-    color: '#666',
-    marginBottom: 10,
+    color: '#2C3E50',
   },
   statusBadge: {
-    alignSelf: 'flex-start',
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: 15,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 20,
+  },
+  statusPending: {
+    backgroundColor: 'rgba(245, 158, 11, 0.1)',
+    borderColor: 'rgba(245, 158, 11, 0.2)',
+    borderWidth: 1,
+  },
+  statusInprogress: {
+    backgroundColor: 'rgba(59, 130, 246, 0.1)',
+    borderColor: 'rgba(59, 130, 246, 0.2)',
+    borderWidth: 1,
+  },
+  statusCompleted: {
+    backgroundColor: 'rgba(16, 185, 129, 0.1)',
+    borderColor: 'rgba(16, 185, 129, 0.2)',
+    borderWidth: 1,
   },
   statusText: {
-    color: Colors.accent,
     fontSize: 12,
-    fontWeight: 'bold',
+    fontWeight: '600',
   },
-  noDataText: {
-    textAlign: 'center',
-    color: '#666',
-    fontStyle: 'italic',
-    marginVertical: 20,
+  userName: {
+    fontSize: 14,
+    color: '#374151',
+    marginBottom: 5,
   },
-  logoutButton: {
-    margin: 20,
-    height: 50,
-    borderRadius: 10,
-    overflow: 'hidden',
+  serviceText: {
+    fontSize: 14,
+    color: '#6B7280',
+    marginBottom: 10,
   },
-  logoutGradient: {
-    flex: 1,
+  requestFooter: {
     flexDirection: 'row',
-    justifyContent: 'center',
+    justifyContent: 'space-between',
     alignItems: 'center',
   },
-  logoutText: {
-    color: Colors.accent,
-    fontSize: 16,
-    fontWeight: 'bold',
-    marginLeft: 10,
+  priorityBadge: {
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 12,
+  },
+  priorityHigh: {
+    backgroundColor: 'rgba(239, 68, 68, 0.1)',
+  },
+  priorityNormal: {
+    backgroundColor: 'rgba(59, 130, 246, 0.1)',
+  },
+  priorityLow: {
+    backgroundColor: 'rgba(107, 114, 128, 0.1)',
+  },
+  priorityText: {
+    fontSize: 12,
+    fontWeight: '600',
+    textTransform: 'capitalize',
+  },
+  dateText: {
+    fontSize: 12,
+    color: '#9CA3AF',
+  },
+  emptyState: {
+    alignItems: 'center',
+    padding: 40,
+  },
+  emptyStateTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#374151',
+    marginTop: 10,
+    marginBottom: 5,
+  },
+  emptyStateText: {
+    fontSize: 14,
+    color: '#6B7280',
+    textAlign: 'center',
   },
 });
 

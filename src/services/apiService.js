@@ -21,6 +21,43 @@ apiService.interceptors.response.use(
 
 let authToken = null;
 
+// Resolver API methods - NEW ADDITION
+export const resolverAPI = {
+  setAuthToken(token) {
+    authToken = token;
+    if (token) {
+      apiService.defaults.headers.common['Authorization'] = `Bearer ${token}`;
+    } else {
+      delete apiService.defaults.headers.common['Authorization'];
+    }
+  },
+
+  // Dashboard
+  async getDashboard() {
+    return apiService.get('/resolver/dashboard');
+  },
+
+  // Get all assigned requests
+  async getAssignedRequests() {
+    return apiService.get('/resolver/requests');
+  },
+
+  // Get request details
+  async getRequestDetails(requestId) {
+    return apiService.get(`/resolver/requests/${requestId}`);
+  },
+
+  // Update request status
+  async updateRequestStatus(requestId, data) {
+    return apiService.put(`/resolver/requests/${requestId}/status`, data);
+  },
+
+  // Get statistics
+  async getStatistics() {
+    return apiService.get('/resolver/statistics');
+  }
+};
+
 // Admin API methods
 export const adminAPI = {
   setAuthToken(token) {
@@ -101,6 +138,7 @@ export const adminAPI = {
 export default {
   setAuthToken(token) {
     adminAPI.setAuthToken(token);
+    resolverAPI.setAuthToken(token);
   },
 
   async login(login, password) {
@@ -150,4 +188,10 @@ export default {
   async getDevelopers() {
     return apiService.get('/developers');
   },
+
+  // Resolver methods - NEW ADDITION
+  resolver: resolverAPI,
+  
+  // Admin methods - keep existing
+  admin: adminAPI,
 };
