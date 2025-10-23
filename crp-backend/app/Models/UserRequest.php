@@ -18,7 +18,7 @@ class UserRequest extends Model
         'priority',
         'request_details',
         'status',
-        'sub_query', // Make sure this is included
+        'sub_query',
         'source',
         'assigned_to',
         'assigner_comment',
@@ -43,6 +43,12 @@ class UserRequest extends Model
     public function assigner()
     {
         return $this->hasOne(Assigner::class, 'request_id');
+    }
+
+    // Fix the resolver relationship
+    public function resolver()
+    {
+        return $this->hasOne(\App\Models\Resolver::class, 'request_id');
     }
 
     public function assignedDeveloper()
