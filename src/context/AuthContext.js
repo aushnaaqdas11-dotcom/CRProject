@@ -20,7 +20,7 @@ export const AuthProvider = ({ children }) => {
           setToken(storedToken);
         }
       } catch (error) {
-        console.error('Error loading user:', error);
+        console.log('Error loading user:', error.message);
       } finally {
         setLoading(false);
       }
@@ -64,7 +64,7 @@ export const AuthProvider = ({ children }) => {
         };
       }
     } catch (error) {
-      console.error('Login error:', error);
+      console.log('Login error:', error.message);
       return {
         success: false,
         message: error.response?.data?.message || 'Network error. Please try again.',
@@ -83,7 +83,7 @@ export const AuthProvider = ({ children }) => {
       setToken(null);
       return { success: true };
     } catch (error) {
-      console.error('Logout error:', error);
+      console.log('Logout error:', error.message);
       return { success: false, message: error.response?.data?.message || 'Failed to logout. Please try again.' };
     }
   };
@@ -95,7 +95,6 @@ export const AuthProvider = ({ children }) => {
   );
 };
 
-// Add this custom hook
 export const useAuth = () => {
   const context = useContext(AuthContext);
   if (context === undefined) {

@@ -17,7 +17,7 @@ import { Picker } from '@react-native-picker/picker';
 const RequestDetailScreen = () => {
   const route = useRoute();
   const navigation = useNavigation();
-  const { userApi } = useAuth();
+  const { userApi, logout } = useAuth();
   const { requestId } = route.params;
 
   const [loading, setLoading] = useState(true);
@@ -28,72 +28,130 @@ const RequestDetailScreen = () => {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState(null);
 
-  const fetchRequestDetails = async () => {
+  const fetchRequestDetails = async (signal) => {
     try {
-      setLoading(true);
       setError(null);
-      const res = await userApi.getProjectRequests();
-      console.log('Request details response:', res.data);
+      const res = await userApi.getProjectRequests({ signal });
       
-      if (res.data.success) {
+      console.log('Request details response:', {
+        success: res.data?.success,
+        requestCount: res.data?.requests?.length,
+        status: res.status,
+      });
+      
+      // Safe data access
+      if (res.data?.success && Array.isArray(res.data.requests)) {
         const selected = res.data.requests.find(r => r.id === requestId);
         if (selected) {
           setRequest(selected);
           setAssignedTo(selected.assigned_to || '');
           setAssignerComment(selected.assigner_comment || '');
+          return true; // Success
         } else {
           setRequest(null);
           setError('Request not found.');
-          console.error('Request not found with ID:', requestId);
+          console.log('Request not found with ID:', requestId);
+          return false;
         }
       } else {
-        const errorMsg = res.data.message || 'Failed to load request details.';
+        const errorMsg = res.data?.message || 'Failed to load request details.';
         setError(errorMsg);
-        console.error('API Error:', errorMsg);
+        console.log('API Error:', errorMsg);
+        return false;
       }
     } catch (error) {
-      console.error('Details fetch error:', error);
-      const errorMsg = error.response?.data?.message || error.message || 'Failed to load request details.';
-      setError(errorMsg);
-      console.error('Full error details:', {
-        message: error.message,
-        response: error.response?.data,
-        status: error.response?.status
-      });
-    } finally {
-      setLoading(false);
+      if (error.name !== 'AbortError') {
+        console.log('Details fetch error:', error.message);
+        const errorMsg = error.response?.data?.message || error.message || 'Failed to load request details.';
+        
+        // Handle specific errors without automatic logout
+        if (error.response?.status === 401) {
+          setError('Session expired. Please log in again.');
+        } else if (error.response?.status === 404) {
+          setError('API route not found. Please contact support.');
+        } else if (error.message.includes('Network Error')) {
+          setError('Network error. Please check your connection.');
+        } else {
+          setError(errorMsg);
+        }
+      }
+      return false;
     }
   };
 
-  const fetchDevelopers = async () => {
+  const fetchDevelopers = async (signal) => {
     try {
-      setError(null);
-      const res = await userApi.getDevelopers();
-      console.log('Developers response:', res.data);
+      console.log('Starting fetchDevelopers');
+      const res = await userApi.getDevelopers({ signal });
       
-      if (res.data.success) {
-        setDevelopers(res.data.developers || []);
+      console.log('Developers response:', {
+        success: res.data?.success,
+        developerCount: res.data?.developers?.length,
+        status: res.status,
+      });
+      
+      // Safe data access with multiple fallbacks
+      if (res.data?.success && Array.isArray(res.data.developers)) {
+        const mappedDevelopers = res.data.developers
+          .map(dev => {
+            // Try multiple possible ID fields
+            const id = dev.id || dev.developer_id || dev.user_id;
+            // Try multiple possible name fields
+            const name = dev.name || dev.full_name || dev.username || 'Unnamed Developer';
+            
+            return id ? { id, name } : null;
+          })
+          .filter(dev => dev !== null); // Remove null entries
+          
+        console.log('Mapped developers:', mappedDevelopers);
+        setDevelopers(mappedDevelopers);
       } else {
-        const errorMsg = res.data.message || 'Failed to load developers.';
-        setError(errorMsg);
-        console.error('Developers API Error:', errorMsg);
+        setDevelopers([]);
+        console.log('Invalid or empty developers data');
       }
     } catch (err) {
-      console.error('Developers fetch error:', err);
-      const errorMsg = err.response?.data?.message || err.message || 'Failed to load developers.';
-      setError(errorMsg);
-      console.error('Full developers error:', {
-        message: err.message,
-        response: err.response?.data,
-        status: err.response?.status
-      });
+      if (err.name !== 'AbortError') {
+        console.log('Developers fetch error:', err.message);
+        // Don't set error for developers fetch - it shouldn't block the main request
+      }
     }
   };
 
   useEffect(() => {
-    fetchRequestDetails();
-    fetchDevelopers();
-  }, []);
+    const abortController = new AbortController();
+    let isMounted = true;
+
+    const loadData = async () => {
+      try {
+        setLoading(true);
+        setError(null);
+        
+        // First fetch request details
+        const requestSuccess = await fetchRequestDetails(abortController.signal);
+        
+        // Only fetch developers if request details were successful and component is still mounted
+        if (requestSuccess && isMounted) {
+          await fetchDevelopers(abortController.signal);
+        }
+      } catch (error) {
+        console.log('Load data error:', error);
+        if (isMounted) {
+          setError('Failed to load data. Please try again.');
+        }
+      } finally {
+        if (isMounted) {
+          setLoading(false);
+        }
+      }
+    };
+
+    loadData();
+
+    return () => {
+      isMounted = false;
+      abortController.abort();
+    };
+  }, [requestId]);
 
   const handleAssign = async () => {
     if (!assignedTo || !assignerComment) {
@@ -114,41 +172,59 @@ const RequestDetailScreen = () => {
       console.log('Assigning request with data:', data);
       
       const res = await userApi.assignToDeveloper(data);
-      console.log('Assign response:', res.data);
+      console.log('Assign response:', { success: res.data?.success, status: res.status });
       
-      if (res.data.success) {
+      if (res.data?.success) {
         Alert.alert('Success', res.data.message || 'Request assigned successfully!', [
           {
             text: 'OK',
-            onPress: () => navigation.goBack()
+            onPress: () => {
+              if (navigation.canGoBack()) {
+                navigation.goBack();
+              } else {
+                navigation.navigate('AssignerDashboard');
+              }
+            }
           }
         ]);
       } else {
-        const errorMsg = res.data.message || 'Failed to assign request.';
+        const errorMsg = res.data?.message || 'Failed to assign request.';
         setError(errorMsg);
         Alert.alert('Assignment Failed', errorMsg);
-        console.error('Assignment API Error:', errorMsg);
       }
     } catch (err) {
-      console.error('Assign request error:', err);
+      console.log('Assign request error:', err.message);
       const errorMsg = err.response?.data?.message || err.message || 'Failed to assign request. Please try again.';
-      setError(errorMsg);
-      Alert.alert('Assignment Error', errorMsg);
-      console.error('Full assignment error:', {
-        message: err.message,
-        response: err.response?.data,
-        status: err.response?.status,
-        stack: err.stack
-      });
+      
+      // Handle errors without automatic logout
+      if (err.response?.status === 401) {
+        setError('Session expired. Please log in again.');
+      } else {
+        setError(errorMsg);
+        Alert.alert('Assignment Error', errorMsg);
+      }
     } finally {
       setSubmitting(false);
     }
   };
 
   const retryFetch = () => {
-    setError(null);
-    fetchRequestDetails();
-    fetchDevelopers();
+    if (!loading) {
+      setError(null);
+      setLoading(true);
+      setRequest(null);
+      setDevelopers([]);
+      
+      const abortController = new AbortController();
+      const loadData = async () => {
+        const requestSuccess = await fetchRequestDetails(abortController.signal);
+        if (requestSuccess) {
+          await fetchDevelopers(abortController.signal);
+        }
+        setLoading(false);
+      };
+      loadData();
+    }
   };
 
   if (loading) {
@@ -169,6 +245,9 @@ const RequestDetailScreen = () => {
           <TouchableOpacity style={styles.retryButton} onPress={retryFetch}>
             <Text style={styles.retryButtonText}>Retry</Text>
           </TouchableOpacity>
+          <TouchableOpacity style={styles.backButton} onPress={() => navigation.canGoBack() && navigation.goBack()}>
+            <Text style={styles.backButtonText}>Go Back</Text>
+          </TouchableOpacity>
         </View>
       </View>
     );
@@ -183,13 +262,23 @@ const RequestDetailScreen = () => {
           <TouchableOpacity style={styles.retryButton} onPress={retryFetch}>
             <Text style={styles.retryButtonText}>Retry</Text>
           </TouchableOpacity>
-          <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
+          <TouchableOpacity style={styles.backButton} onPress={() => navigation.canGoBack() && navigation.goBack()}>
             <Text style={styles.backButtonText}>Go Back</Text>
           </TouchableOpacity>
         </View>
       </View>
     );
   }
+
+  // Safe data access for request object
+  const safeRequest = {
+    project: request.project || { name: 'N/A' },
+    user: request.user || { name: 'N/A' },
+    service: request.service || { name: 'N/A' },
+    priority: request.priority || 'N/A',
+    status: request.status || 'N/A',
+    request_details: request.request_details || 'No details provided',
+  };
 
   return (
     <Animatable.View animation="fadeIn" style={styles.container}>
@@ -207,38 +296,50 @@ const RequestDetailScreen = () => {
 
         <View style={styles.detailBox}>
           <Text style={styles.label}>Project:</Text>
-          <Text style={styles.value}>{request.project?.name || 'N/A'}</Text>
+          <Text style={styles.value}>{safeRequest.project.name}</Text>
 
           <Text style={styles.label}>User:</Text>
-          <Text style={styles.value}>{request.user?.name || 'N/A'}</Text>
+          <Text style={styles.value}>{safeRequest.user.name}</Text>
 
           <Text style={styles.label}>Query:</Text>
-          <Text style={styles.value}>{request.service?.name || 'N/A'}</Text>
+          <Text style={styles.value}>{safeRequest.service.name}</Text>
 
           <Text style={styles.label}>Priority:</Text>
-          <Text style={[styles.value, { color: priorityColor(request.priority) }]}>
-            {request.priority}
+          <Text style={[styles.value, { color: priorityColor(safeRequest.priority) }]}>
+            {safeRequest.priority}
           </Text>
 
           <Text style={styles.label}>Status:</Text>
-          <Text style={[styles.value, { color: statusColor(request.status) }]}>
-            {request.status}
+          <Text style={[styles.value, { color: statusColor(safeRequest.status) }]}>
+            {safeRequest.status}
           </Text>
 
           <Text style={styles.label}>Request Details:</Text>
-          <Text style={styles.value}>{request.request_details}</Text>
+          <Text style={styles.value}>{safeRequest.request_details}</Text>
 
           <Text style={styles.label}>Assigned To:</Text>
-          <Picker
-            selectedValue={assignedTo}
-            onValueChange={setAssignedTo}
-            style={styles.input}
-          >
-            <Picker.Item label="Select a developer" value="" />
-            {developers.map(dev => (
-              <Picker.Item key={dev.id} label={dev.name} value={dev.id} />
-            ))}
-          </Picker>
+          <View style={styles.pickerContainer}>
+            <Picker
+              selectedValue={assignedTo}
+              onValueChange={setAssignedTo}
+              style={styles.picker}
+              dropdownIconColor="#FFFFFF"
+              enabled={developers.length > 0}
+            >
+              <Picker.Item label="Select a developer" value="" color="#FFFFFF" />
+              {developers.map(dev => (
+                <Picker.Item 
+                  key={dev.id} 
+                  label={dev.name} 
+                  value={dev.id} 
+                  color="#FFFFFF" 
+                />
+              ))}
+            </Picker>
+          </View>
+          {developers.length === 0 && (
+            <Text style={styles.errorText}>No developers available. Please try again later.</Text>
+          )}
 
           <Text style={styles.label}>Assigner Comment:</Text>
           <TextInput
@@ -252,8 +353,8 @@ const RequestDetailScreen = () => {
         </View>
 
         <TouchableOpacity
-          style={[styles.assignBtn, submitting && styles.assignBtnDisabled]}
-          disabled={submitting}
+          style={[styles.assignBtn, (submitting || developers.length === 0) && styles.assignBtnDisabled]}
+          disabled={submitting || developers.length === 0}
           onPress={handleAssign}
         >
           <Text style={styles.assignBtnText}>
@@ -261,9 +362,12 @@ const RequestDetailScreen = () => {
           </Text>
         </TouchableOpacity>
 
+        {/* Space between buttons */}
+        <View style={styles.buttonSpacer} />
+
         <TouchableOpacity
           style={styles.backButton}
-          onPress={() => navigation.goBack()}
+          onPress={() => navigation.canGoBack() && navigation.goBack()}
         >
           <Text style={styles.backButtonText}>Go Back</Text>
         </TouchableOpacity>
@@ -298,6 +402,7 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     flexGrow: 1,
+    paddingBottom: 20,
   },
   loader: { 
     flex: 1, 
@@ -347,10 +452,24 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#E5E7EB',
     fontSize: 16,
+    color: '#000000',
   },
   textArea: {
     height: 80,
     textAlignVertical: 'top',
+  },
+  // Picker styling with dark background for white text visibility
+  pickerContainer: {
+    backgroundColor: '#374151',
+    borderRadius: 10,
+    marginTop: 6,
+    borderWidth: 1,
+    borderColor: '#4B5563',
+    overflow: 'hidden',
+  },
+  picker: {
+    color: '#FFFFFF',
+    height: 50,
   },
   assignBtn: {
     backgroundColor: '#4ECDC4',
@@ -372,6 +491,26 @@ const styles = StyleSheet.create({
     fontSize: 16, 
     fontWeight: '700' 
   },
+  // Space between buttons
+  buttonSpacer: {
+    height: 20,
+  },
+  backButton: {
+    backgroundColor: '#6B7280',
+    padding: 16,
+    borderRadius: 12,
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  backButtonText: {
+    color: 'white',
+    fontSize: 16,
+    fontWeight: '600',
+  },
   errorContainer: {
     flex: 1,
     justifyContent: 'center',
@@ -387,10 +526,11 @@ const styles = StyleSheet.create({
   },
   errorText: {
     fontSize: 16,
-    color: '#374151',
+    color: '#DC2626',
     textAlign: 'center',
     marginBottom: 20,
     lineHeight: 22,
+    fontStyle: 'italic',
   },
   inlineError: {
     backgroundColor: '#FEE2E2',
@@ -420,18 +560,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   retryButtonText: {
-    color: 'white',
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  backButton: {
-    backgroundColor: '#6B7280',
-    padding: 12,
-    borderRadius: 8,
-    minWidth: 100,
-    alignItems: 'center',
-  },
-  backButtonText: {
     color: 'white',
     fontSize: 16,
     fontWeight: '600',
