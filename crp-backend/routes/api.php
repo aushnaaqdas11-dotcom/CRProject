@@ -28,11 +28,14 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/sub-queries/{queryId}', [UserController::class, 'getSubQueries']);
 
     // Assigner routes
-    Route::get('/assigner/projects', [AssignerController::class, 'getAssignedProjects']);
-    Route::get('/assigner/requests', [AssignerController::class, 'getProjectRequests']);
-    Route::post('/assigner/assign', [AssignerController::class, 'assignToDeveloper']);
-    Route::get('/developers', [AssignerController::class, 'getDevelopers']);
-
+   // Assigner routes
+Route::get('/assigner/projects', [AssignerController::class, 'getAssignedProjects']);
+Route::get('/assigner/requests', [AssignerController::class, 'getProjectRequests']);
+Route::get('/assigner/requests/status/{status}', [AssignerController::class, 'getRequestsByStatus']);
+Route::get('/assigner/requests/{id}', [AssignerController::class, 'getRequestDetails']);
+Route::post('/assigner/assign', [AssignerController::class, 'assignToDeveloper']);
+Route::put('/assigner/requests/{id}/pricing', [AssignerController::class, 'updatePricingAndAttachment']);
+Route::get('/developers', [AssignerController::class, 'getDevelopers']);
     // Resolver routes - NEW ADDITION
     Route::prefix('resolver')->group(function () {
         Route::get('/dashboard', [ResolverController::class, 'dashboard']);

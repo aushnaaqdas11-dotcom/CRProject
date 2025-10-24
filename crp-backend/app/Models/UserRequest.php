@@ -22,6 +22,12 @@ class UserRequest extends Model
         'source',
         'assigned_to',
         'assigner_comment',
+        'pricing',
+        'attachment',
+    ];
+
+    protected $casts = [
+        'pricing' => 'decimal:2',
     ];
 
     // Relations
@@ -59,5 +65,27 @@ class UserRequest extends Model
     public function getAssignerCommentAttribute()
     {
         return $this->assigner ? $this->assigner->assigner_comment : null;
+    }
+
+    // Helper methods to check status
+    public function isPending()
+    {
+        return $this->status === 'pending';
+    }
+
+    public function isInProgress()
+    {
+        return $this->status === 'inprogress';
+    }
+
+    public function isCompleted()
+    {
+        return $this->status === 'completed';
+    }
+
+    // Check if pricing and attachment are enabled
+    public function canUpdatePricing()
+    {
+        return $this->isCompleted();
     }
 }
