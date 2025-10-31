@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import {
   View, Text, ScrollView, StyleSheet, TouchableOpacity,
-  TextInput, ActivityIndicator, StatusBar
+  TextInput, ActivityIndicator, StatusBar, Alert,
+  RefreshControl, Dimensions, Animated, PanResponder
 } from 'react-native';
 import { useAuth } from '../context/AuthContext';
 import { useNavigation } from '@react-navigation/native';
@@ -11,9 +12,15 @@ import Icon from 'react-native-vector-icons/FontAwesome';
 import { Colors } from '../styles/theme';
 import * as Animatable from 'react-native-animatable';
 
+const { width, height } = Dimensions.get('window');
+
 const UserDashboard = () => {
   const { user, userApi, logout } = useAuth();
   const navigation = useNavigation();
+  
+  const [drawerOpen, setDrawerOpen] = useState(false);
+  const slideAnim = useRef(new Animated.Value(-width)).current;
+  const overlayAnim = useRef(new Animated.Value(0)).current;
 
   const [services, setServices] = useState([]);
   const [webProjects, setWebProjects] = useState([]);
@@ -25,6 +32,7 @@ const UserDashboard = () => {
   const [requestDetails, setRequestDetails] = useState('');
   const [recentRequests, setRecentRequests] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [notification, setNotification] = useState({ message: '', type: '' });
   const intervalRef = useRef(null);
 
@@ -33,6 +41,28 @@ const UserDashboard = () => {
   const [selectedSubQuery, setSelectedSubQuery] = useState('');
   const [source, setSource] = useState('web');
   const [loadingSubQueries, setLoadingSubQueries] = useState(false);
+
+  // PanResponder for swipe gestures
+  const panResponder = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => drawerOpen,
+      onMoveShouldSetPanResponder: (_, gestureState) => {
+        return drawerOpen && Math.abs(gestureState.dx) > 10;
+      },
+      onPanResponderMove: (_, gestureState) => {
+        if (gestureState.dx < 0) {
+          slideAnim.setValue(gestureState.dx);
+        }
+      },
+      onPanResponderRelease: (_, gestureState) => {
+        if (gestureState.dx < -100) {
+          closeDrawer();
+        } else {
+          openDrawer();
+        }
+      },
+    })
+  ).current;
 
   useEffect(() => {
     fetchDashboardData();
@@ -76,7 +106,13 @@ const UserDashboard = () => {
       showNotification('Failed to load dashboard data', 'error');
     } finally {
       setLoading(false);
+      setRefreshing(false);
     }
+  };
+
+  const onRefresh = () => {
+    setRefreshing(true);
+    fetchDashboardData();
   };
 
   const fetchSubQueries = async (queryId) => {
@@ -152,285 +188,462 @@ const UserDashboard = () => {
   };
 
   const handleLogout = async () => {
-    const result = await logout();
-    if (result.success) {
-      navigation.navigate('Login');
-    } else {
-      showNotification(result.message, 'error');
-    }
+    Alert.alert(
+      'Logout',
+      'Are you sure you want to logout?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Logout',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              const result = await logout();
+              if (result.success) {
+                navigation.navigate('Login');
+              } else {
+                showNotification(result.message, 'error');
+              }
+            } catch (error) {
+              Alert.alert('Error', 'Failed to logout');
+            }
+          }
+        }
+      ]
+    );
   };
 
-  if (loading) return (
-    <View style={styles.loader}>
-      <ActivityIndicator size="large" color="#2C3E50" />
-      <Text style={styles.loadingText}>Loading dashboard...</Text>
-    </View>
-  );
+  const openDrawer = () => {
+    setDrawerOpen(true);
+    Animated.parallel([
+      Animated.timing(slideAnim, {
+        toValue: 0,
+        duration: 300,
+        useNativeDriver: true,
+      }),
+      Animated.timing(overlayAnim, {
+        toValue: 1,
+        duration: 300,
+        useNativeDriver: true,
+      }),
+    ]).start();
+  };
 
-  return (
-    <View style={styles.container}>
-      <StatusBar barStyle="light-content" translucent backgroundColor="transparent" />
-      
-      {/* Header - Matching Admin Dashboard */}
+  const closeDrawer = () => {
+    Animated.parallel([
+      Animated.timing(slideAnim, {
+        toValue: -width,
+        duration: 300,
+        useNativeDriver: true,
+      }),
+      Animated.timing(overlayAnim, {
+        toValue: 0,
+        duration: 300,
+        useNativeDriver: true,
+      }),
+    ]).start(() => {
+      setDrawerOpen(false);
+    });
+  };
+
+  const navigationView = () => (
+    <View style={styles.drawerContainer}>
       <LinearGradient
         colors={['#2C3E50', '#4ECDC4']}
-        style={styles.header}
+        style={styles.drawerHeader}
       >
-        <View style={styles.headerContent}>
-          <View style={styles.headerText}>
-            <Text style={styles.welcomeText}>
-              Welcome, {user?.name || 'User'}
-            </Text>
-            <Text style={styles.roleText}>User Dashboard</Text>
+        <View style={styles.drawerHeaderContent}>
+          <View style={styles.userAvatar}>
+            <Icon name="user" size={40} color="#fff" />
           </View>
-          <View style={styles.headerButtons}>
-            <TouchableOpacity 
-              style={styles.viewHistoryBtn} 
-              onPress={() => navigation.navigate('UserHistory')}
-            >
-              <LinearGradient colors={['rgba(255,255,255,0.2)', 'rgba(255,255,255,0.3)']} style={styles.viewHistoryBtnGradient}>
-                <Icon name="history" size={16} color="#fff" style={styles.viewHistoryIcon} />
-                <Text style={styles.viewHistoryText}>View History</Text>
-              </LinearGradient>
-            </TouchableOpacity>
-            <TouchableOpacity onPress={handleLogout} style={styles.logoutBtn}>
-              <Icon name="sign-out" size={20} color="#fff" />
-            </TouchableOpacity>
-          </View>
+          <Text style={styles.drawerUserName}>
+            {user?.name || 'User'}
+          </Text>
+          <Text style={styles.drawerUserRole}>User</Text>
         </View>
       </LinearGradient>
 
-      {/* Main Content */}
-      <ScrollView 
-        contentContainerStyle={styles.scrollContent}
-        showsVerticalScrollIndicator={false}
+      <View style={styles.drawerMenu}>
+        <TouchableOpacity 
+          style={styles.drawerItem}
+          onPress={() => {
+            closeDrawer();
+          }}
+        >
+          <Icon name="home" size={20} color="#2C3E50" />
+          <Text style={styles.drawerItemText}>Dashboard</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity 
+          style={styles.drawerItem}
+          onPress={() => {
+            closeDrawer();
+            navigation.navigate('UserHistory');
+          }}
+        >
+          <Icon name="history" size={20} color="#2C3E50" />
+          <Text style={styles.drawerItemText}>View History</Text>
+        </TouchableOpacity>
+
+        <View style={styles.drawerDivider} />
+
+        <TouchableOpacity 
+          style={[styles.drawerItem, styles.logoutDrawerItem]}
+          onPress={() => {
+            closeDrawer();
+            handleLogout();
+          }}
+        >
+          <Icon name="sign-out" size={20} color="#e74c3c" />
+          <Text style={[styles.drawerItemText, styles.logoutText]}>Logout</Text>
+        </TouchableOpacity>
+      </View>
+    </View>
+  );
+
+  if (loading) {
+    return (
+      <View style={styles.loader}>
+        <ActivityIndicator size="large" color="#2C3E50" />
+        <Text style={styles.loadingText}>Loading dashboard...</Text>
+      </View>
+    );
+  }
+
+  return (
+    <View style={styles.container}>
+      <StatusBar backgroundColor="#2C3E50" barStyle="light-content" />
+      
+      {/* Overlay */}
+      {drawerOpen && (
+        <Animated.View 
+          style={[
+            styles.overlay,
+            {
+              opacity: overlayAnim,
+            }
+          ]}
+        >
+          <TouchableOpacity 
+            style={styles.overlayTouchable}
+            onPress={closeDrawer}
+            activeOpacity={1}
+          />
+        </Animated.View>
+      )}
+      
+      {/* Drawer */}
+      <Animated.View 
+        style={[
+          styles.drawer,
+          {
+            transform: [{ translateX: slideAnim }],
+          }
+        ]}
       >
-        {notification.message && (
-          <Animatable.View 
-            animation="fadeInDown"
-            style={[
-              styles.notification, 
-              notification.type === 'error' ? styles.error : styles.success
-            ]}
+        {navigationView()}
+      </Animated.View>
+
+      {/* Main Content */}
+      <Animated.View 
+        style={[
+          styles.mainContent,
+          {
+            transform: [
+              {
+                translateX: drawerOpen ? 
+                  slideAnim.interpolate({
+                    inputRange: [-width, 0],
+                    outputRange: [0, width * 0.7],
+                    extrapolate: 'clamp',
+                  }) : 0
+              }
+            ]
+          }
+        ]}
+        {...panResponder.panHandlers}
+      >
+        {/* Top Navbar */}
+        <View style={styles.navbar}>
+          <TouchableOpacity 
+            style={styles.menuButton}
+            onPress={openDrawer}
           >
-            <Text style={styles.notificationText}>{notification.message}</Text>
-          </Animatable.View>
-        )}
-
-        {/* Dashboard Title */}
-        <Animatable.View animation="fadeInDown" duration={800} style={styles.titleSection}>
-          <Text style={styles.dashboardTitle}>Project Enhancement Portal</Text>
-          <Text style={styles.dashboardSubtitle}>Submit Change Request</Text>
-          <Text style={styles.dashboardDescription}>Streamline and manage your requests with ease</Text>
-        </Animatable.View>
-
-        {/* Request Form */}
-        <Animatable.View animation="fadeInUp" duration={800} delay={200} style={styles.requestForm}>
-          <LinearGradient colors={['#ffffff', '#f8f9fa', '#ffffff']} style={styles.cardGradient}>
-            
-            {/* Project Type Selection */}
-            <View style={styles.formSection}>
-              <Text style={styles.label}>Select Project Type</Text>
-              <View style={styles.radioGroup}>
-                {['web', 'app'].map((type) => (
-                  <TouchableOpacity
-                    key={type}
-                    style={[
-                      styles.radioOption,
-                      targetType === type && styles.radioSelected,
-                    ]}
-                    onPress={() => setTargetType(type)}
-                  >
-                    <Text style={[
-                      styles.radioText,
-                      targetType === type && styles.radioTextSelected
-                    ]}>
-                      {type === 'web' ? 'Web' : 'App'}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
-            </View>
-
-            {/* Project Dropdown */}
-            <View style={styles.formSection}>
-              <Text style={styles.label}>Select Project</Text>
-              <View style={styles.inputWrapper}>
-                <Icon name="folder" size={20} color="#4ECDC4" style={styles.inputIcon} />
-                <Dropdown
-                  style={styles.dropdown}
-                  placeholderStyle={styles.placeholderStyle}
-                  selectedTextStyle={styles.selectedTextStyle}
-                  inputSearchStyle={styles.inputSearchStyle}
-                  data={(targetType === 'web' ? webProjects : appProjects).map(p => ({
-                    label: p.name,
-                    value: p.id,
-                  }))}
-                  search
-                  maxHeight={200}
-                  labelField="label"
-                  valueField="value"
-                  placeholder="Select Project"
-                  searchPlaceholder="Search..."
-                  value={selectedProject}
-                  onChange={item => setSelectedProject(item.value)}
-                />
-              </View>
-            </View>
-
-            {/* Service Dropdown */}
-            <View style={styles.formSection}>
-              <Text style={styles.label}>Change Request For</Text>
-              <View style={styles.inputWrapper}>
-                <Icon name="cogs" size={20} color="#4ECDC4" style={styles.inputIcon} />
-                <Dropdown
-                  style={styles.dropdown}
-                  placeholderStyle={styles.placeholderStyle}
-                  selectedTextStyle={styles.selectedTextStyle}
-                  inputSearchStyle={styles.inputSearchStyle}
-                  data={services.map(s => ({ label: s.name, value: s.id }))}
-                  search
-                  maxHeight={200}
-                  labelField="label"
-                  valueField="value"
-                  placeholder="Select a request"
-                  searchPlaceholder="Search..."
-                  value={selectedService}
-                  onChange={item => setSelectedService(item.value)}
-                />
-              </View>
-            </View>
-
-            {/* SubQuery Dropdown */}
-            <View style={styles.formSection}>
-              <Text style={styles.label}>Select Sub Query</Text>
-              <View style={styles.inputWrapper}>
-                <Icon name="list-alt" size={20} color="#4ECDC4" style={styles.inputIcon} />
-                <Dropdown
-                  style={[styles.dropdown, !selectedService && styles.dropdownDisabled]}
-                  placeholderStyle={styles.placeholderStyle}
-                  selectedTextStyle={styles.selectedTextStyle}
-                  inputSearchStyle={styles.inputSearchStyle}
-                  data={subQueries.map(sq => ({ label: sq.name, value: sq.id }))}
-                  search
-                  maxHeight={200}
-                  labelField="label"
-                  valueField="value"
-                  placeholder={
-                    loadingSubQueries 
-                      ? "Loading subqueries..." 
-                      : !selectedService 
-                      ? "Select a request first" 
-                      : subQueries.length === 0 
-                      ? "No subqueries available" 
-                      : "Select Sub Query"
-                  }
-                  searchPlaceholder="Search..."
-                  value={selectedSubQuery}
-                  onChange={item => setSelectedSubQuery(item.value)}
-                  disabled={!selectedService || loadingSubQueries}
-                />
-                {loadingSubQueries && (
-                  <ActivityIndicator size="small" color="#4ECDC4" style={styles.loadingIndicator} />
-                )}
-              </View>
-            </View>
-
-            {/* Priority Level */}
-            <View style={styles.formSection}>
-              <Text style={styles.label}>Priority Level</Text>
-              <View style={styles.priorityGroup}>
-                {[
-                  { key: 'high', label: 'High' },
-                  { key: 'normal', label: 'Normal' }, 
-                  { key: 'low', label: 'Anytime' }
-                ].map((lvl) => (
-                  <TouchableOpacity
-                    key={lvl.key}
-                    style={[
-                      styles.priorityOption,
-                      priority === lvl.key &&
-                        (lvl.key === 'high'
-                          ? styles.priorityHighSelected
-                          : lvl.key === 'normal'
-                          ? styles.priorityNormalSelected
-                          : styles.priorityLowSelected),
-                    ]}
-                    onPress={() => setPriority(lvl.key)}
-                  >
-                    <Text
-                      style={[
-                        styles.priorityText,
-                        priority === lvl.key && styles.priorityTextSelected,
-                      ]}
-                    >
-                      {lvl.label}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
-            </View>
-
-            {/* Change Request Details */}
-            <View style={styles.formSection}>
-              <Text style={styles.label}>Change Request Details</Text>
-              <View style={styles.textareaWrapper}>
-                <Icon name="edit" size={20} color="#4ECDC4" style={styles.textareaIcon} />
-                <TextInput
-                  style={styles.textarea}
-                  multiline
-                  placeholder="Please describe the changes you need in detail..."
-                  value={requestDetails}
-                  placeholderTextColor="#999"
-                  onChangeText={setRequestDetails}
-                  textAlignVertical="top"
-                />
-              </View>
-            </View>
-
-            {/* Submit Button */}
-            <TouchableOpacity style={styles.submitBtn} onPress={handleSubmit}>
-              <LinearGradient colors={['#2C3E50', '#4ECDC4']} style={styles.submitBtnGradient}>
-                <Text style={styles.submitBtnText}>Submit Request</Text>
-              </LinearGradient>
+            <Icon name="bars" size={24} color="#fff" />
+          </TouchableOpacity>
+          
+          <View style={styles.navbarCenter}>
+            <Text style={styles.navbarTitle}>User Dashboard</Text>
+          </View>
+          
+          <View style={styles.navbarRight}>
+            <TouchableOpacity style={styles.navbarIcon}>
+              <Icon name="user" size={20} color="#fff" />
             </TouchableOpacity>
-          </LinearGradient>
-        </Animatable.View>
+          </View>
+        </View>
 
-        {/* Recent Requests */}
-        <Animatable.View animation="fadeInUp" duration={800} delay={400} style={styles.requestsHistory}>
-          <LinearGradient colors={['#ffffff', '#f8f9fa', '#ffffff']} style={styles.cardGradient}>
-            <Text style={styles.historyTitle}>Recent Requests</Text>
-            {recentRequests.length === 0 ? (
-              <Text style={styles.noRequests}>No active requests found.</Text>
-            ) : (
-              recentRequests.map((req, index) => (
-                <Animatable.View 
-                  key={req.id} 
-                  animation="fadeInRight" 
-                  duration={600}
-                  delay={index * 100}
-                  style={styles.requestCard}
+        <ScrollView 
+          refreshControl={
+            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+          }
+          contentContainerStyle={styles.scrollContent}
+          showsVerticalScrollIndicator={false}
+        >
+          {/* Header - Matching Admin Dashboard */}
+          <LinearGradient
+            colors={['#2C3E50', '#4ECDC4']}
+            style={styles.header}
+          >
+            <View style={styles.headerContent}>
+              <View style={styles.headerText}>
+                <Text style={styles.welcomeText}>
+                  Welcome, {user?.name || 'User'}
+                </Text>
+                <Text style={styles.roleText}>User Dashboard</Text>
+              </View>
+              <View style={styles.headerButtons}>
+                <TouchableOpacity 
+                  style={styles.viewHistoryBtn} 
+                  onPress={() => navigation.navigate('UserHistory')}
                 >
-                  <View style={styles.requestHeader}>
-                    <Text style={styles.serviceName}>{req.service?.name || 'No Service'}</Text>
-                    <Text style={[
-                      styles.statusBadge,
-                      req.status === 'pending' ? styles.statusPending :
-                      req.status === 'inprogress' ? styles.statusInprogress : styles.statusCompleted
-                    ]}>
-                      {req.status?.charAt(0).toUpperCase() + req.status?.slice(1)}
-                    </Text>
-                  </View>
-                  <Text style={styles.projectName}>Source: {req.project?.type === 'app' ? 'App' : 'Web'} - {req.project?.name || 'N/A'}</Text>
-                  <Text style={styles.requestDate}>{new Date(req.created_at).toLocaleDateString()}</Text>
-                  <Text style={styles.requestContent}>{req.request_details || 'No details'}</Text>
-                </Animatable.View>
-              ))
-            )}
+                  <LinearGradient colors={['rgba(255,255,255,0.2)', 'rgba(255,255,255,0.3)']} style={styles.viewHistoryBtnGradient}>
+                    <Icon name="history" size={16} color="#fff" style={styles.viewHistoryIcon} />
+                    <Text style={styles.viewHistoryText}>View History</Text>
+                  </LinearGradient>
+                </TouchableOpacity>
+              </View>
+            </View>
           </LinearGradient>
-        </Animatable.View>
-      </ScrollView>
+
+          {/* Main Content */}
+          {notification.message && (
+            <Animatable.View 
+              animation="fadeInDown"
+              style={[
+                styles.notification, 
+                notification.type === 'error' ? styles.error : styles.success
+              ]}
+            >
+              <Text style={styles.notificationText}>{notification.message}</Text>
+            </Animatable.View>
+          )}
+
+          {/* Dashboard Title */}
+          <Animatable.View animation="fadeInDown" duration={800} style={styles.titleSection}>
+            <Text style={styles.dashboardTitle}>Project Enhancement Portal</Text>
+            <Text style={styles.dashboardSubtitle}>Submit Change Request</Text>
+            <Text style={styles.dashboardDescription}>Streamline and manage your requests with ease</Text>
+          </Animatable.View>
+
+          {/* Request Form */}
+          <Animatable.View animation="fadeInUp" duration={800} delay={200} style={styles.requestForm}>
+            <LinearGradient colors={['#ffffff', '#f8f9fa', '#ffffff']} style={styles.cardGradient}>
+              
+              {/* Project Type Selection */}
+              <View style={styles.formSection}>
+                <Text style={styles.label}>Select Project Type</Text>
+                <View style={styles.radioGroup}>
+                  {['web', 'app'].map((type) => (
+                    <TouchableOpacity
+                      key={type}
+                      style={[
+                        styles.radioOption,
+                        targetType === type && styles.radioSelected,
+                      ]}
+                      onPress={() => setTargetType(type)}
+                    >
+                      <Text style={[
+                        styles.radioText,
+                        targetType === type && styles.radioTextSelected
+                      ]}>
+                        {type === 'web' ? 'Web' : 'App'}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </View>
+
+              {/* Project Dropdown */}
+              <View style={styles.formSection}>
+                <Text style={styles.label}>Select Project</Text>
+                <View style={styles.inputWrapper}>
+                  <Icon name="folder" size={20} color="#4ECDC4" style={styles.inputIcon} />
+                  <Dropdown
+                    style={styles.dropdown}
+                    placeholderStyle={styles.placeholderStyle}
+                    selectedTextStyle={styles.selectedTextStyle}
+                    inputSearchStyle={styles.inputSearchStyle}
+                    data={(targetType === 'web' ? webProjects : appProjects).map(p => ({
+                      label: p.name,
+                      value: p.id,
+                    }))}
+                    search
+                    maxHeight={200}
+                    labelField="label"
+                    valueField="value"
+                    placeholder="Select Project"
+                    searchPlaceholder="Search..."
+                    value={selectedProject}
+                    onChange={item => setSelectedProject(item.value)}
+                  />
+                </View>
+              </View>
+
+              {/* Service Dropdown */}
+              <View style={styles.formSection}>
+                <Text style={styles.label}>Change Request For</Text>
+                <View style={styles.inputWrapper}>
+                  <Icon name="cogs" size={20} color="#4ECDC4" style={styles.inputIcon} />
+                  <Dropdown
+                    style={styles.dropdown}
+                    placeholderStyle={styles.placeholderStyle}
+                    selectedTextStyle={styles.selectedTextStyle}
+                    inputSearchStyle={styles.inputSearchStyle}
+                    data={services.map(s => ({ label: s.name, value: s.id }))}
+                    search
+                    maxHeight={200}
+                    labelField="label"
+                    valueField="value"
+                    placeholder="Select a request"
+                    searchPlaceholder="Search..."
+                    value={selectedService}
+                    onChange={item => setSelectedService(item.value)}
+                  />
+                </View>
+              </View>
+
+              {/* SubQuery Dropdown */}
+              <View style={styles.formSection}>
+                <Text style={styles.label}>Select Sub Query</Text>
+                <View style={styles.inputWrapper}>
+                  <Icon name="list-alt" size={20} color="#4ECDC4" style={styles.inputIcon} />
+                  <Dropdown
+                    style={[styles.dropdown, !selectedService && styles.dropdownDisabled]}
+                    placeholderStyle={styles.placeholderStyle}
+                    selectedTextStyle={styles.selectedTextStyle}
+                    inputSearchStyle={styles.inputSearchStyle}
+                    data={subQueries.map(sq => ({ label: sq.name, value: sq.id }))}
+                    search
+                    maxHeight={200}
+                    labelField="label"
+                    valueField="value"
+                    placeholder={
+                      loadingSubQueries 
+                        ? "Loading subqueries..." 
+                        : !selectedService 
+                        ? "Select a request first" 
+                        : subQueries.length === 0 
+                        ? "No subqueries available" 
+                        : "Select Sub Query"
+                    }
+                    searchPlaceholder="Search..."
+                    value={selectedSubQuery}
+                    onChange={item => setSelectedSubQuery(item.value)}
+                    disabled={!selectedService || loadingSubQueries}
+                  />
+                  {loadingSubQueries && (
+                    <ActivityIndicator size="small" color="#4ECDC4" style={styles.loadingIndicator} />
+                  )}
+                </View>
+              </View>
+
+              {/* Priority Level */}
+              <View style={styles.formSection}>
+                <Text style={styles.label}>Priority Level</Text>
+                <View style={styles.priorityGroup}>
+                  {[
+                    { key: 'high', label: 'High' },
+                    { key: 'normal', label: 'Normal' }, 
+                    { key: 'low', label: 'Anytime' }
+                  ].map((lvl) => (
+                    <TouchableOpacity
+                      key={lvl.key}
+                      style={[
+                        styles.priorityOption,
+                        priority === lvl.key &&
+                          (lvl.key === 'high'
+                            ? styles.priorityHighSelected
+                            : lvl.key === 'normal'
+                            ? styles.priorityNormalSelected
+                            : styles.priorityLowSelected),
+                      ]}
+                      onPress={() => setPriority(lvl.key)}
+                    >
+                      <Text
+                        style={[
+                          styles.priorityText,
+                          priority === lvl.key && styles.priorityTextSelected,
+                        ]}
+                      >
+                        {lvl.label}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </View>
+
+              {/* Change Request Details */}
+              <View style={styles.formSection}>
+                <Text style={styles.label}>Change Request Details</Text>
+                <View style={styles.textareaWrapper}>
+                  <Icon name="edit" size={20} color="#4ECDC4" style={styles.textareaIcon} />
+                  <TextInput
+                    style={styles.textarea}
+                    multiline
+                    placeholder="Please describe the changes you need in detail..."
+                    value={requestDetails}
+                    placeholderTextColor="#999"
+                    onChangeText={setRequestDetails}
+                    textAlignVertical="top"
+                  />
+                </View>
+              </View>
+
+              {/* Submit Button */}
+              <TouchableOpacity style={styles.submitBtn} onPress={handleSubmit}>
+                <LinearGradient colors={['#2C3E50', '#4ECDC4']} style={styles.submitBtnGradient}>
+                  <Text style={styles.submitBtnText}>Submit Request</Text>
+                </LinearGradient>
+              </TouchableOpacity>
+            </LinearGradient>
+          </Animatable.View>
+
+          {/* Recent Requests */}
+          <Animatable.View animation="fadeInUp" duration={800} delay={400} style={styles.requestsHistory}>
+            <LinearGradient colors={['#ffffff', '#f8f9fa', '#ffffff']} style={styles.cardGradient}>
+              <Text style={styles.historyTitle}>Recent Requests</Text>
+              {recentRequests.length === 0 ? (
+                <Text style={styles.noRequests}>No active requests found.</Text>
+              ) : (
+                recentRequests.map((req, index) => (
+                  <Animatable.View 
+                    key={req.id} 
+                    animation="fadeInRight" 
+                    duration={600}
+                    delay={index * 100}
+                    style={styles.requestCard}
+                  >
+                    <View style={styles.requestHeader}>
+                      <Text style={styles.serviceName}>{req.service?.name || 'No Service'}</Text>
+                      <Text style={[
+                        styles.statusBadge,
+                        req.status === 'pending' ? styles.statusPending :
+                        req.status === 'inprogress' ? styles.statusInprogress : styles.statusCompleted
+                      ]}>
+                        {req.status?.charAt(0).toUpperCase() + req.status?.slice(1)}
+                      </Text>
+                    </View>
+                    <Text style={styles.projectName}>Source: {req.project?.type === 'app' ? 'App' : 'Web'} - {req.project?.name || 'N/A'}</Text>
+                    <Text style={styles.requestDate}>{new Date(req.created_at).toLocaleDateString()}</Text>
+                    <Text style={styles.requestContent}>{req.request_details || 'No details'}</Text>
+                  </Animatable.View>
+                ))
+              )}
+            </LinearGradient>
+          </Animatable.View>
+        </ScrollView>
+      </Animated.View>
     </View>
   );
 };
@@ -440,19 +653,150 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#F8FAFC',
   },
+  // Overlay styles
+  overlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    zIndex: 999,
+  },
+  overlayTouchable: {
+    flex: 1,
+  },
+  // Drawer styles
+  drawer: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    bottom: 0,
+    width: width * 0.8,
+    zIndex: 1000,
+    elevation: 1000,
+  },
+  mainContent: {
+    flex: 1,
+    backgroundColor: '#F8FAFC',
+    zIndex: 1,
+  },
   scrollContent: {
-    flexGrow: 1,
+    padding: 0,
+    paddingTop: 1,
+  },
+  
+  // Navbar Styles
+  navbar: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    backgroundColor: '#2C3E50',
+    paddingHorizontal: 16,
+    paddingTop: 35,
+    paddingBottom: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: '#34495e',
+    shadowColor: '#000000ff',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+    elevation: 5,
+  },
+  menuButton: {
+    padding: 8,
+  },
+  navbarCenter: {
+    flex: 1,
+    alignItems: 'center',
+  },
+  navbarTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#fff',
+  },
+  navbarRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  navbarIcon: {
+    padding: 8,
+  },
+  
+  // Drawer Styles
+  drawerContainer: {
+    flex: 1,
+    backgroundColor: '#fff',
+    width: '100%',
+    height: '100%',
+  },
+  drawerHeader: {
     padding: 20,
-    paddingTop: 10,
+    paddingTop: 60,
+    paddingBottom: 30,
+  },
+  drawerHeaderContent: {
+    alignItems: 'center',
+  },
+  userAvatar: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 15,
+  },
+  drawerUserName: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#fff',
+    marginBottom: 5,
+  },
+  drawerUserRole: {
+    fontSize: 14,
+    color: '#fff',
+    opacity: 0.8,
+  },
+  drawerMenu: {
+    flex: 1,
+    padding: 20,
+  },
+  drawerItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 15,
+    paddingHorizontal: 10,
+    borderRadius: 8,
+    marginBottom: 5,
+  },
+  drawerItemText: {
+    fontSize: 16,
+    color: '#2C3E50',
+    marginLeft: 15,
+    fontWeight: '500',
+  },
+  drawerDivider: {
+    height: 1,
+    backgroundColor: '#ecf0f1',
+    marginVertical: 15,
+  },
+  logoutDrawerItem: {
+    marginTop: 'auto',
+    marginBottom: 20,
+  },
+  logoutText: {
+    color: '#e74c3c',
   },
   
   // Header - Matching Admin Dashboard
   header: {
     paddingHorizontal: 20,
-    paddingTop: 60,
+    paddingTop: 25,
     paddingBottom: 30,
     borderBottomLeftRadius: 30,
     borderBottomRightRadius: 30,
+    marginBottom: 9,
   },
   headerContent: {
     flexDirection: 'row',
@@ -462,13 +806,8 @@ const styles = StyleSheet.create({
   headerText: {
     flex: 1,
   },
-  headerButtons: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-  },
   welcomeText: {
-    fontSize: 24,
+    fontSize: 23,
     fontWeight: 'bold',
     color: '#fff',
     marginBottom: 5,
@@ -491,7 +830,7 @@ const styles = StyleSheet.create({
   viewHistoryBtnGradient: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 15,
+    paddingHorizontal: 16,
     paddingVertical: 10,
     borderRadius: 10,
   },
@@ -503,17 +842,12 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     fontSize: 14,
   },
-  // Logout Button
-  logoutBtn: {
-    padding: 10,
-    borderRadius: 10,
-    backgroundColor: 'rgba(255,255,255,0.2)',
-  },
   
   // Title Section
   titleSection: {
     marginBottom: 25,
     alignItems: 'center',
+    paddingHorizontal: 20,
   },
   dashboardTitle: {
     fontSize: 26,
@@ -546,6 +880,7 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.15,
     shadowRadius: 16,
     elevation: 8,
+    marginHorizontal: 20,
   },
   cardGradient: {
     padding: 20,
@@ -733,6 +1068,7 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.15,
     shadowRadius: 16,
     elevation: 8,
+    marginHorizontal: 20,
   },
   historyTitle: {
     fontSize: 20,
@@ -814,6 +1150,7 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.2,
     shadowRadius: 5,
     elevation: 5,
+    marginHorizontal: 20,
   },
   notificationText: {
     color: 'white',

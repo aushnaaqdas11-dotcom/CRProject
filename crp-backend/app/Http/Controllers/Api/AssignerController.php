@@ -10,6 +10,8 @@ use App\Models\Developer;
 use App\Models\Project;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\Log;
 
 class AssignerController extends Controller
 {
@@ -156,14 +158,14 @@ class AssignerController extends Controller
     {
         $validated = $request->validate([
             'pricing' => 'nullable|numeric|min:0',
-            'attachment' => 'nullable|string',
+            'attachment' => 'nullable|file|mimes:pdf,doc,docx,jpg,jpeg,png|max:5120', // 5MB max
         ]);
 
         $assigner = Auth::user();
         
         $userRequest = UserRequest::findOrFail($id);
 
-        // Check if assigner has access and request is completed
+        // Check if assigner has access
         $hasAccess = Project::where('id', $userRequest->project_id)
             ->where('assigner_id', $assigner->id)
             ->exists();
@@ -175,23 +177,140 @@ class AssignerController extends Controller
             ], 403);
         }
 
-        if ($userRequest->status !== 'completed') {
-            return response()->json([
-                'success' => false,
-                'message' => 'Pricing and attachment can only be updated for completed requests'
-            ], 400);
-        }
+        DB::transaction(function() use ($userRequest, $validated, $request) {
+            $attachmentPath = $userRequest->attachment;
 
-        // Update pricing and attachment
-        $userRequest->update([
-            'pricing' => $validated['pricing'] ?? null,
-            'attachment' => $validated['attachment'] ?? null,
-        ]);
+            // Handle file upload
+            if ($request->hasFile('attachment')) {
+                Log::info('File upload started', [
+                    'request_id' => $userRequest->id,
+                    'file_name' => $request->file('attachment')->getClientOriginalName()
+                ]);
+
+                // Delete old attachment if exists
+                if ($attachmentPath && Storage::exists($attachmentPath)) {
+                    Storage::delete($attachmentPath);
+                    Log::info('Old attachment deleted', ['path' => $attachmentPath]);
+                }
+
+                // Store new attachment
+                $file = $request->file('attachment');
+                $fileName = 'request_' . $userRequest->id . '_' . time() . '.' . $file->getClientOriginalExtension();
+                $attachmentPath = $file->storeAs('attachments', $fileName, 'public');
+                
+                Log::info('File stored', [
+                    'original_name' => $file->getClientOriginalName(),
+                    'stored_path' => $attachmentPath,
+                    'file_size' => $file->getSize()
+                ]);
+            }
+
+            // Update request
+            $userRequest->update([
+                'pricing' => $validated['pricing'] ?? $userRequest->pricing,
+                'attachment' => $attachmentPath,
+            ]);
+
+            Log::info('Request updated', [
+                'new_attachment_path' => $attachmentPath,
+                'pricing' => $validated['pricing'] ?? $userRequest->pricing
+            ]);
+        });
 
         return response()->json([
             'success' => true,
             'message' => 'Pricing and attachment updated successfully',
-            'request' => $userRequest
+            'request' => $userRequest->fresh()
         ]);
+    }
+
+    // Method to serve attachments
+    public function getAttachment($id)
+    {
+        $assigner = Auth::user();
+        $userRequest = UserRequest::findOrFail($id);
+
+        // Check if assigner has access
+        $hasAccess = Project::where('id', $userRequest->project_id)
+            ->where('assigner_id', $assigner->id)
+            ->exists();
+
+        if (!$hasAccess) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Unauthorized access'
+            ], 403);
+        }
+
+        if (!$userRequest->attachment) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Attachment not found in database'
+            ], 404);
+        }
+
+        // Handle different attachment path formats
+        $attachmentPath = $userRequest->attachment;
+        
+        // Case 1: If it's just a filename (old web attachments)
+        if (!str_contains($attachmentPath, '/') && !str_contains($attachmentPath, '\\')) {
+            $attachmentPath = 'attachments/' . $attachmentPath;
+        }
+        
+        Log::info('Attachment access attempt', [
+            'request_id' => $id,
+            'original_path' => $userRequest->attachment,
+            'resolved_path' => $attachmentPath
+        ]);
+
+        // Check if file exists in storage
+        if (!Storage::exists($attachmentPath)) {
+            // Try to find in public directory
+            $publicPath = public_path('storage/' . $attachmentPath);
+            if (file_exists($publicPath)) {
+                Log::info('File found in public directory', ['path' => $publicPath]);
+                return response()->file($publicPath);
+            }
+            
+            Log::error('Attachment file not found', [
+                'storage_path' => $attachmentPath,
+                'public_path' => $publicPath,
+                'all_attachments' => Storage::files('attachments')
+            ]);
+            
+            return response()->json([
+                'success' => false,
+                'message' => 'Attachment file not found in storage',
+                'debug' => 'Looking for file at: ' . $attachmentPath
+            ], 404);
+        }
+
+        Log::info('Serving attachment file', ['path' => $attachmentPath]);
+        return Storage::response($attachmentPath);
+    }
+
+    // Temporary debug method - remove after testing
+    public function debugAttachments()
+    {
+        $requests = UserRequest::whereNotNull('attachment')->get();
+        
+        $results = [];
+        foreach ($requests as $request) {
+            $attachmentPath = $request->attachment;
+            if (!str_contains($attachmentPath, '/') && !str_contains($attachmentPath, '\\')) {
+                $attachmentPath = 'attachments/' . $attachmentPath;
+            }
+            
+            $results[] = [
+                'id' => $request->id,
+                'attachment_field' => $request->attachment,
+                'resolved_path' => $attachmentPath,
+                'file_exists_storage' => Storage::exists($attachmentPath),
+                'file_exists_public' => file_exists(public_path('storage/' . $attachmentPath)),
+                'storage_files' => Storage::files('attachments'),
+            ];
+        }
+        
+        return $results;
     }
 }

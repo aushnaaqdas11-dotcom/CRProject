@@ -1,5 +1,5 @@
 // screens/ResolverRequestDetail.js
-import React, { useState, useEffect, useContext } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -11,24 +11,122 @@ import {
   Alert,
   Modal,
   KeyboardAvoidingView,
-  Platform
+  Platform,
+  Dimensions,
+  StatusBar,
+  DrawerLayoutAndroid
 } from 'react-native';
 import { useAuth } from '../context/AuthContext';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
+import LinearGradient from 'react-native-linear-gradient';
+
+const { width } = Dimensions.get('window');
 
 const ResolverRequestDetail = ({ route, navigation }) => {
+  // ALL HOOKS MUST BE CALLED AT THE TOP LEVEL, IN THE SAME ORDER
   const { requestId } = route.params;
-  const { user, userApi } = useAuth();
+  const { user, userApi, logout } = useAuth();
   const [requestData, setRequestData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [updating, setUpdating] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
+  const drawerRef = useRef(null); // useRef MUST be called here, not conditionally
 
   const [formData, setFormData] = useState({
     status: '',
     working_hours: '',
     resolver_comment: ''
   });
+
+  // Rest of the component logic...
+  const openDrawer = () => {
+    if (drawerRef.current) {
+      drawerRef.current.openDrawer();
+    }
+  };
+
+  const closeDrawer = () => {
+    if (drawerRef.current) {
+      drawerRef.current.closeDrawer();
+    }
+  };
+
+  const handleLogout = async () => {
+    Alert.alert(
+      'Logout',
+      'Are you sure you want to logout?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Logout',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await logout();
+              navigation.navigate('Login');
+            } catch (error) {
+              Alert.alert('Error', 'Failed to logout');
+            }
+          }
+        }
+      ]
+    );
+  };
+
+  const navigationView = () => (
+    <View style={styles.drawerContainer}>
+      <LinearGradient
+        colors={['#2C3E50', '#4ECDC4']}
+        style={styles.drawerHeader}
+      >
+        <View style={styles.drawerHeaderContent}>
+          <View style={styles.userAvatar}>
+            <Icon name="account-tie" size={40} color="#fff" />
+          </View>
+          <Text style={styles.drawerUserName}>
+            {user?.name || 'Resolver'}
+          </Text>
+          <Text style={styles.drawerUserRole}>Resolver</Text>
+        </View>
+      </LinearGradient>
+
+      <View style={styles.drawerMenu}>
+        <TouchableOpacity 
+          style={styles.drawerItem}
+          onPress={() => {
+            closeDrawer();
+            navigation.navigate('ResolverDashboard');
+          }}
+        >
+          <Icon name="home" size={20} color="#2C3E50" />
+          <Text style={styles.drawerItemText}>Dashboard</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity 
+          style={styles.drawerItem}
+          onPress={() => {
+            closeDrawer();
+          }}
+        >
+          <Icon name="format-list-bulleted" size={20} color="#2C3E50" />
+          <Text style={styles.drawerItemText}>My Requests</Text>
+        </TouchableOpacity>
+
+        <View style={styles.drawerDivider} />
+
+        <TouchableOpacity 
+          style={[styles.drawerItem, styles.logoutDrawerItem]}
+          onPress={() => {
+            closeDrawer();
+            handleLogout();
+          }}
+        >
+          <Icon name="logout" size={20} color="#e74c3c" />
+          <Text style={[styles.drawerItemText, styles.logoutText]}>Logout</Text>
+        </TouchableOpacity>
+      </View>
+    </View>
+  );
 
   const fetchRequestDetails = async () => {
     try {
@@ -94,412 +192,375 @@ const ResolverRequestDetail = ({ route, navigation }) => {
   }, [requestId]);
 
   const InfoItem = ({ label, value, icon, isBadge = false, badgeType = '' }) => (
-    <View style={styles.infoItem}>
-      <Text style={styles.infoLabel}>
+    <View style={styles.detailRow}>
+      <Text style={styles.label}>
         <Icon name={icon} size={16} color="#2C3E50" /> {label}
       </Text>
       {isBadge ? (
-        <View style={[styles.badge, styles[badgeType]]}>
-          <Text style={styles.badgeText}>{value}</Text>
-        </View>
+        <Text style={[styles.value, { color: badgeType.includes('status') ? statusColor(value) : priorityColor(value) }]}>
+          {value}
+        </Text>
       ) : (
-        <View style={styles.infoValue}>
-          <Text style={styles.infoValueText}>{value || 'N/A'}</Text>
-        </View>
+        <Text style={styles.value}>{value || 'N/A'}</Text>
       )}
     </View>
   );
 
   if (loading) {
     return (
-      <View style={styles.centerContainer}>
-        <ActivityIndicator size="large" color="#4ECDC4" />
+      <View style={styles.loader}>
+        <ActivityIndicator size="large" color="#2C3E50" />
         <Text style={styles.loadingText}>Loading Request Details...</Text>
       </View>
     );
   }
 
   return (
-    <KeyboardAvoidingView 
-      style={styles.container}
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
+    <DrawerLayoutAndroid
+      ref={drawerRef}
+      drawerWidth={300}
+      drawerPosition="left"
+      renderNavigationView={navigationView}
     >
-      {/* Success Modal */}
-      <Modal
-        visible={showSuccess}
-        transparent
-        animationType="fade"
-      >
-        <View style={styles.modalOverlay}>
-          <View style={styles.successModal}>
-            <Icon name="check-circle" size={40} color="#10B981" />
-            <Text style={styles.successTitle}>Success!</Text>
-            <Text style={styles.successMessage}>Status updated successfully</Text>
-            <TouchableOpacity 
-              style={styles.successClose}
-              onPress={() => setShowSuccess(false)}
-            >
-              <Icon name="close" size={20} color="white" />
+      <View style={styles.container}>
+        <StatusBar backgroundColor="#2C3E50" barStyle="light-content" />
+        
+        {/* Top Navbar */}
+        <View style={styles.navbar}>
+          <TouchableOpacity 
+            style={styles.menuButton}
+            onPress={openDrawer}
+          >
+            <Icon name="menu" size={24} color="#fff" />
+          </TouchableOpacity>
+          
+          <View style={styles.navbarCenter}>
+            <Text style={styles.navbarTitle}>Request Details</Text>
+          </View>
+          
+          <View style={styles.navbarRight}>
+            <TouchableOpacity style={styles.navbarIcon}>
+              <Icon name="account" size={20} color="#fff" />
             </TouchableOpacity>
           </View>
         </View>
-      </Modal>
 
-      {/* Header with Back Button */}
-      <TouchableOpacity 
-        style={styles.backButton}
-        onPress={() => navigation.goBack()}
-      >
-        <Icon name="arrow-left" size={24} color="#2C3E50" />
-        <Text style={styles.backButtonText}>Back to Dashboard</Text>
-      </TouchableOpacity>
-
-      <ScrollView 
-        style={styles.content}
-        showsVerticalScrollIndicator={false}
-        contentContainerStyle={styles.scrollContent}
-        keyboardShouldPersistTaps="handled"
-      >
-        {requestData && (
-          <View style={styles.card}>
-            {/* Card Header */}
-            <View style={styles.cardHeader}>
-              <Text style={styles.cardTitle}>
-                <Icon name="file-document" size={24} color="white" /> Request Details
-              </Text>
-              <View style={styles.requestIdBadge}>
-                <Text style={styles.requestIdText}>ID: #{requestData.request.id}</Text>
-              </View>
-            </View>
-
-            <View style={styles.cardBody}>
-              {/* Information Grid */}
-              <View style={styles.infoGrid}>
-                <InfoItem 
-                  label="User" 
-                  value={requestData.request.user?.name} 
-                  icon="account" 
-                />
-                <InfoItem 
-                  label="Status" 
-                  value={requestData.request.status} 
-                  icon="information" 
-                  isBadge 
-                  badgeType={`status${requestData.request.status.charAt(0).toUpperCase() + requestData.request.status.slice(1)}`}
-                />
-                <InfoItem 
-                  label="Priority" 
-                  value={requestData.request.priority} 
-                  icon="alert-circle" 
-                  isBadge 
-                  badgeType={`priority${requestData.request.priority.charAt(0).toUpperCase() + requestData.request.priority.slice(1)}`}
-                />
-                <InfoItem 
-                  label="Created" 
-                  value={new Date(requestData.request.created_at).toLocaleDateString('en-US', {
-                    day: 'numeric',
-                    month: 'short',
-                    year: 'numeric',
-                    hour: '2-digit',
-                    minute: '2-digit'
-                  })} 
-                  icon="calendar" 
-                />
-                <InfoItem 
-                  label="Assigner Message" 
-                  value={requestData.assigner_comment} 
-                  icon="email" 
-                />
-              </View>
-
-              {/* Request Details Section */}
-              <View style={styles.detailsSection}>
-                <Text style={styles.detailsLabel}>
-                  <Icon name="format-align-left" size={16} color="#2C3E50" /> Request Details
-                </Text>
-                <View style={styles.detailsContent}>
-                  <Text style={styles.detailsText}>{requestData.request.request_details}</Text>
-                </View>
-              </View>
-
-              {/* Update Form */}
-              <View style={styles.updateForm}>
-                <Text style={styles.formTitle}>Update Request Status</Text>
-
-                {/* Status Selector */}
-                <View style={styles.formGroup}>
-                  <Text style={styles.formLabel}>
-                    <Icon name="sync" size={16} color="#2C3E50" /> Update Status
-                  </Text>
-                  <View style={styles.statusButtons}>
-                    {['pending', 'inprogress', 'completed'].map(status => (
-                      <TouchableOpacity
-                        key={status}
-                        style={[
-                          styles.statusButton,
-                          formData.status === status && styles.statusButtonActive,
-                          styles[`statusButton${status.charAt(0).toUpperCase() + status.slice(1)}`]
-                        ]}
-                        onPress={() => setFormData(prev => ({ ...prev, status }))}
-                      >
-                        <Text style={[
-                          styles.statusButtonText,
-                          formData.status === status && styles.statusButtonTextActive
-                        ]}>
-                          {status === 'inprogress' ? 'In Progress' : status.charAt(0).toUpperCase() + status.slice(1)}
-                        </Text>
-                      </TouchableOpacity>
-                    ))}
-                  </View>
-                </View>
-
-                {/* Working Hours */}
-                <View style={styles.formGroup}>
-                  <Text style={styles.formLabel}>
-                    <Icon name="clock" size={16} color="#2C3E50" /> Working Hours
-                  </Text>
-                  <TextInput
-                    style={styles.textInput}
-                    value={formData.working_hours}
-                    onChangeText={(text) => setFormData(prev => ({ ...prev, working_hours: text }))}
-                    placeholder="Enter working hours"
-                    keyboardType="numeric"
-                    returnKeyType="done"
-                  />
-                </View>
-
-                {/* Resolver Comment */}
-                <View style={styles.formGroup}>
-                  <Text style={styles.formLabel}>
-                    <Icon name="comment" size={16} color="#2C3E50" /> Resolver Comment
-                  </Text>
-                  <TextInput
-                    style={[styles.textInput, styles.textArea]}
-                    value={formData.resolver_comment}
-                    onChangeText={(text) => setFormData(prev => ({ ...prev, resolver_comment: text }))}
-                    placeholder="Enter your comments..."
-                    multiline
-                    numberOfLines={4}
-                    textAlignVertical="top"
-                    returnKeyType="done"
-                    blurOnSubmit={true}
-                  />
-                </View>
-
-                {/* Update Button */}
+        <KeyboardAvoidingView 
+          style={styles.container}
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
+        >
+          {/* Success Modal */}
+          <Modal
+            visible={showSuccess}
+            transparent
+            animationType="fade"
+          >
+            <View style={styles.modalOverlay}>
+              <View style={styles.successModal}>
+                <Icon name="check-circle" size={40} color="#10B981" />
+                <Text style={styles.successTitle}>Success!</Text>
+                <Text style={styles.successMessage}>Status updated successfully</Text>
                 <TouchableOpacity 
-                  style={[styles.updateButton, updating && styles.updateButtonDisabled]}
-                  onPress={handleUpdateStatus}
-                  disabled={updating}
+                  style={styles.successClose}
+                  onPress={() => setShowSuccess(false)}
                 >
-                  {updating ? (
-                    <ActivityIndicator size="small" color="white" />
-                  ) : (
-                    <>
-                      <Icon name="check" size={20} color="white" />
-                      <Text style={styles.updateButtonText}>Update Status</Text>
-                    </>
-                  )}
+                  <Icon name="close" size={20} color="white" />
                 </TouchableOpacity>
               </View>
             </View>
-          </View>
-        )}
-      </ScrollView>
-    </KeyboardAvoidingView>
+          </Modal>
+
+          <ScrollView 
+            showsVerticalScrollIndicator={false}
+            contentContainerStyle={styles.scrollContent}
+            keyboardShouldPersistTaps="handled"
+          >
+            {requestData && (
+              <>
+                {/* Request Details Card */}
+                <View style={styles.detailCard}>
+                  <Text style={styles.cardTitle}>Request Information</Text>
+                  
+                  <InfoItem 
+                    label="User" 
+                    value={requestData.request.user?.name} 
+                    icon="account" 
+                  />
+                  <InfoItem 
+                    label="Status" 
+                    value={requestData.request.status} 
+                    icon="information" 
+                    isBadge 
+                    badgeType={`status${requestData.request.status.charAt(0).toUpperCase() + requestData.request.status.slice(1)}`}
+                  />
+                  <InfoItem 
+                    label="Priority" 
+                    value={requestData.request.priority} 
+                    icon="alert-circle" 
+                    isBadge 
+                    badgeType={`priority${requestData.request.priority.charAt(0).toUpperCase() + requestData.request.priority.slice(1)}`}
+                  />
+                  <InfoItem 
+                    label="Created" 
+                    value={new Date(requestData.request.created_at).toLocaleDateString('en-US', {
+                      day: 'numeric',
+                      month: 'short',
+                      year: 'numeric',
+                      hour: '2-digit',
+                      minute: '2-digit'
+                    })} 
+                    icon="calendar" 
+                  />
+                  <InfoItem 
+                    label="Assigner Message" 
+                    value={requestData.assigner_comment} 
+                    icon="email" 
+                  />
+
+                  <View style={styles.detailSection}>
+                    <Text style={styles.label}>Request Details:</Text>
+                    <Text style={styles.detailsText}>{requestData.request.request_details}</Text>
+                  </View>
+                </View>
+
+                {/* Update Form Card */}
+                <View style={styles.detailCard}>
+                  <Text style={styles.cardTitle}>Update Request Status</Text>
+
+                  {/* Status Selector */}
+                  <View style={styles.detailSection}>
+                    <Text style={styles.label}>
+                      <Icon name="sync" size={16} color="#2C3E50" /> Update Status
+                    </Text>
+                    <View style={styles.statusButtons}>
+                      {['pending', 'inprogress', 'completed'].map(status => (
+                        <TouchableOpacity
+                          key={status}
+                          style={[
+                            styles.statusButton,
+                            formData.status === status && styles.statusButtonActive,
+                            styles[`statusButton${status.charAt(0).toUpperCase() + status.slice(1)}`]
+                          ]}
+                          onPress={() => setFormData(prev => ({ ...prev, status }))}
+                        >
+                          <Text style={[
+                            styles.statusButtonText,
+                            formData.status === status && styles.statusButtonTextActive
+                          ]}>
+                            {status === 'inprogress' ? 'In Progress' : status.charAt(0).toUpperCase() + status.slice(1)}
+                          </Text>
+                        </TouchableOpacity>
+                      ))}
+                    </View>
+                  </View>
+
+                  {/* Working Hours */}
+                  <View style={styles.detailSection}>
+                    <Text style={styles.label}>
+                      <Icon name="clock" size={16} color="#2C3E50" /> Working Hours
+                    </Text>
+                    <TextInput
+                      style={styles.textArea}
+                      value={formData.working_hours}
+                      onChangeText={(text) => setFormData(prev => ({ ...prev, working_hours: text }))}
+                      placeholder="Enter working hours"
+                      keyboardType="numeric"
+                      returnKeyType="done"
+                    />
+                  </View>
+
+                  {/* Resolver Comment */}
+                  <View style={styles.detailSection}>
+                    <Text style={styles.label}>
+                      <Icon name="comment" size={16} color="#2C3E50" /> Resolver Comment
+                    </Text>
+                    <TextInput
+                      style={[styles.textArea, { height: 100 }]}
+                      value={formData.resolver_comment}
+                      onChangeText={(text) => setFormData(prev => ({ ...prev, resolver_comment: text }))}
+                      placeholder="Enter your comments..."
+                      multiline
+                      numberOfLines={4}
+                      textAlignVertical="top"
+                      returnKeyType="done"
+                      blurOnSubmit={true}
+                    />
+                  </View>
+                </View>
+
+                {/* Action Buttons */}
+                <TouchableOpacity
+                  style={[styles.assignBtn, (updating || !formData.status) && styles.assignBtnDisabled]}
+                  disabled={updating || !formData.status}
+                  onPress={handleUpdateStatus}
+                >
+                  <LinearGradient colors={['#2C3E50', '#4ECDC4']} style={styles.buttonGradient}>
+                    {updating ? (
+                      <ActivityIndicator size="small" color="white" />
+                    ) : (
+                      <Text style={styles.buttonText}>
+                        Update Status
+                      </Text>
+                    )}
+                  </LinearGradient>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={styles.backButton}
+                  onPress={() => navigation.goBack()}
+                >
+                  <LinearGradient colors={['#6B7280', '#9CA3AF']} style={styles.buttonGradient}>
+                    <Text style={styles.buttonText}>Go Back</Text>
+                  </LinearGradient>
+                </TouchableOpacity>
+              </>
+            )}
+          </ScrollView>
+        </KeyboardAvoidingView>
+      </View>
+    </DrawerLayoutAndroid>
   );
 };
 
+const statusColor = (status) => {
+  switch (status?.toLowerCase()) {
+    case 'pending': return '#F59E0B';
+    case 'inprogress': return '#3B82F6';
+    case 'completed': return '#10B981';
+    default: return '#6B7280';
+  }
+};
+
+const priorityColor = (priority) => {
+  switch (priority?.toLowerCase()) {
+    case 'high': return '#DC2626';
+    case 'normal': return '#3B82F6';
+    case 'low': return '#059669';
+    default: return '#374151';
+  }
+};
+
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
+  container: { 
+    flex: 1, 
     backgroundColor: '#F8FAFC',
   },
-  centerContainer: {
-    flex: 1,
-    justifyContent: 'center',
+  scrollContent: {
+    flexGrow: 1,
+    paddingBottom: 20,
+  },
+  loader: { 
+    flex: 1, 
+    justifyContent: 'center', 
     alignItems: 'center',
     backgroundColor: '#F8FAFC',
-    padding: 15,
   },
   loadingText: {
     marginTop: 10,
-    color: '#64748B',
-  },
-  backButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 15,
-    paddingTop: Platform.OS === 'ios' ? 50 : 20,
-    backgroundColor: '#F8FAFC',
-    marginTop:20,
-  },
-  backButtonText: {
     fontSize: 16,
     color: '#2C3E50',
-    marginLeft: 8,
-    fontWeight: '500',
-    
   },
-  content: {
+  
+  // Navbar Styles
+  navbar: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    backgroundColor: '#2C3E50',
+    paddingHorizontal: 16,
+    paddingTop: 35,
+    paddingBottom: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: '#34495e',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+    elevation: 5,
+  },
+  menuButton: {
+    padding: 8,
+  },
+  navbarCenter: {
     flex: 1,
+    alignItems: 'center',
   },
-  scrollContent: {
-    padding: 15,
-    paddingBottom: 30, // Extra padding at bottom for keyboard
+  navbarTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#fff',
   },
-  card: {
-    backgroundColor: 'white',
+  navbarRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  navbarIcon: {
+    padding: 8,
+  },
+
+  // Detail Card
+  detailCard: {
+    backgroundColor: '#fff',
     borderRadius: 20,
-    overflow: 'hidden',
+    padding: 25,
+    margin: 20,
+    marginBottom: 15,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.1,
     shadowRadius: 12,
     elevation: 5,
-    marginBottom: 20,
-  },
-  cardHeader: {
-    backgroundColor: '#2C3E50',
-    padding: 25,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
   },
   cardTitle: {
     fontSize: 20,
     fontWeight: 'bold',
-    color: 'white',
+    color: '#2C3E50',
+    marginBottom: 20,
+    textAlign: 'center',
   },
-  requestIdBadge: {
-    backgroundColor: 'rgba(255,255,255,0.2)',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 8,
+  detailRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 15,
+    paddingBottom: 15,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f1f5f9',
   },
-  requestIdText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: 'white',
-  },
-  cardBody: {
-    padding: 20,
-  },
-  infoGrid: {
-    marginBottom: 25,
-  },
-  infoItem: {
+  detailSection: {
     marginBottom: 20,
   },
-  infoLabel: {
+  label: { 
+    fontWeight: '600', 
+    color: '#374151',
     fontSize: 14,
-    fontWeight: '600',
-    color: '#2C3E50',
-    marginBottom: 8,
-    textTransform: 'uppercase',
+    flex: 1,
   },
-  infoValue: {
-    backgroundColor: '#E6FFFA',
-    padding: 15,
-    borderRadius: 12,
-    borderLeftWidth: 4,
-    borderLeftColor: '#4ECDC4',
-  },
-  infoValueText: {
-    fontSize: 16,
-    color: '#1A252F',
-  },
-  badge: {
-    paddingHorizontal: 15,
-    paddingVertical: 8,
-    borderRadius: 20,
-    alignSelf: 'flex-start',
-  },
-  badgeText: {
-    fontSize: 14,
-    fontWeight: '600',
-    textTransform: 'capitalize',
-  },
-  statusPending: {
-    backgroundColor: 'rgba(245, 158, 11, 0.1)',
-    borderColor: 'rgba(245, 158, 11, 0.2)',
-    borderWidth: 1,
-  },
-  statusInprogress: {
-    backgroundColor: 'rgba(59, 130, 246, 0.1)',
-    borderColor: 'rgba(59, 130, 246, 0.2)',
-    borderWidth: 1,
-  },
-  statusCompleted: {
-    backgroundColor: 'rgba(16, 185, 129, 0.1)',
-    borderColor: 'rgba(16, 185, 129, 0.2)',
-    borderWidth: 1,
-  },
-  priorityHigh: {
-    backgroundColor: 'rgba(239, 68, 68, 0.1)',
-  },
-  priorityNormal: {
-    backgroundColor: 'rgba(59, 130, 246, 0.1)',
-  },
-  priorityLow: {
-    backgroundColor: 'rgba(107, 114, 128, 0.1)',
-  },
-  detailsSection: {
-    backgroundColor: 'white',
-    padding: 20,
-    borderRadius: 12,
-    marginBottom: 25,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 6,
-    elevation: 2,
-    borderLeftWidth: 4,
-    borderLeftColor: '#4ECDC4',
-  },
-  detailsLabel: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#2C3E50',
-    marginBottom: 12,
-    textTransform: 'uppercase',
-  },
-  detailsContent: {
-    backgroundColor: '#F8FAFC',
-    padding: 15,
-    borderRadius: 8,
+  value: { 
+    fontSize: 16, 
+    color: '#111827', 
+    fontWeight: '500',
+    flex: 1,
+    textAlign: 'right',
   },
   detailsText: {
     fontSize: 16,
-    lineHeight: 24,
     color: '#374151',
+    lineHeight: 24,
+    marginTop: 8,
+    backgroundColor: '#f8fafc',
+    padding: 15,
+    borderRadius: 10,
+    borderLeftWidth: 4,
+    borderLeftColor: '#4ECDC4',
   },
-  updateForm: {
-    backgroundColor: 'rgba(248, 250, 252, 0.8)',
-    padding: 25,
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.6)',
-  },
-  formTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#2C3E50',
-    marginBottom: 20,
-  },
-  formGroup: {
-    marginBottom: 20,
-  },
-  formLabel: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#2C3E50',
-    marginBottom: 10,
-  },
+
+  // Status Buttons
   statusButtons: {
     flexDirection: 'row',
     justifyContent: 'space-between',
+    marginTop: 8,
   },
   statusButton: {
     flex: 1,
@@ -526,40 +587,57 @@ const styles = StyleSheet.create({
   statusButtonTextActive: {
     color: '#2C3E50',
   },
-  textInput: {
-    backgroundColor: 'white',
-    borderWidth: 2,
-    borderColor: '#E2E8F0',
+
+  // Input and TextArea
+  textArea: {
+    backgroundColor: '#F9FAFB',
     borderRadius: 12,
     padding: 15,
+    marginTop: 8,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
     fontSize: 16,
-  },
-  textArea: {
-    height: 100,
+    color: '#000000',
     textAlignVertical: 'top',
   },
-  updateButton: {
-    backgroundColor: '#10B981',
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
+
+  // Buttons
+  buttonGradient: {
     padding: 16,
     borderRadius: 12,
-    shadowColor: '#10B981',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 4,
+    alignItems: 'center',
   },
-  updateButtonDisabled: {
-    opacity: 0.7,
-  },
-  updateButtonText: {
+  buttonText: {
     color: 'white',
     fontSize: 16,
     fontWeight: '600',
-    marginLeft: 8,
   },
+  assignBtn: {
+    marginHorizontal: 20,
+    marginBottom: 12,
+    borderRadius: 12,
+    overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 5,
+  },
+  assignBtnDisabled: {
+    opacity: 0.6,
+  },
+  backButton: {
+    marginHorizontal: 20,
+    borderRadius: 12,
+    overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+
+  // Modal Styles
   modalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0,0,0,0.5)',
@@ -597,6 +675,70 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255,255,255,0.2)',
     borderRadius: 15,
     padding: 5,
+  },
+
+  // Drawer Styles
+  drawerContainer: {
+    flex: 1,
+    backgroundColor: '#fff',
+  },
+  drawerHeader: {
+    padding: 20,
+    paddingTop: 60,
+    paddingBottom: 30,
+  },
+  drawerHeaderContent: {
+    alignItems: 'center',
+  },
+  userAvatar: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 15,
+  },
+  drawerUserName: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#fff',
+    marginBottom: 5,
+  },
+  drawerUserRole: {
+    fontSize: 14,
+    color: '#fff',
+    opacity: 0.8,
+  },
+  drawerMenu: {
+    flex: 1,
+    padding: 20,
+  },
+  drawerItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 15,
+    paddingHorizontal: 10,
+    borderRadius: 8,
+    marginBottom: 5,
+  },
+  drawerItemText: {
+    fontSize: 16,
+    color: '#2C3E50',
+    marginLeft: 15,
+    fontWeight: '500',
+  },
+  drawerDivider: {
+    height: 1,
+    backgroundColor: '#ecf0f1',
+    marginVertical: 15,
+  },
+  logoutDrawerItem: {
+    marginTop: 'auto',
+    marginBottom: 20,
+  },
+  logoutText: {
+    color: '#e74c3c',
   },
 });
 

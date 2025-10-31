@@ -28,15 +28,19 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/sub-queries/{queryId}', [UserController::class, 'getSubQueries']);
 
     // Assigner routes
-   // Assigner routes
-Route::get('/assigner/projects', [AssignerController::class, 'getAssignedProjects']);
-Route::get('/assigner/requests', [AssignerController::class, 'getProjectRequests']);
-Route::get('/assigner/requests/status/{status}', [AssignerController::class, 'getRequestsByStatus']);
-Route::get('/assigner/requests/{id}', [AssignerController::class, 'getRequestDetails']);
-Route::post('/assigner/assign', [AssignerController::class, 'assignToDeveloper']);
-Route::put('/assigner/requests/{id}/pricing', [AssignerController::class, 'updatePricingAndAttachment']);
-Route::get('/developers', [AssignerController::class, 'getDevelopers']);
-    // Resolver routes - NEW ADDITION
+    Route::get('/assigner/projects', [AssignerController::class, 'getAssignedProjects']);
+    Route::get('/assigner/requests', [AssignerController::class, 'getProjectRequests']);
+    Route::get('/assigner/requests/status/{status}', [AssignerController::class, 'getRequestsByStatus']);
+    Route::get('/assigner/requests/{id}', [AssignerController::class, 'getRequestDetails']);
+    Route::post('/assigner/assign', [AssignerController::class, 'assignToDeveloper']);
+    Route::put('/assigner/requests/{id}/pricing', [AssignerController::class, 'updatePricingAndAttachment']);
+    Route::get('/assigner/requests/{id}/attachment', [AssignerController::class, 'getAttachment']);
+    Route::get('/developers', [AssignerController::class, 'getDevelopers']);
+    
+    // Temporary debug route - remove after testing
+    Route::get('/debug-attachments', [AssignerController::class, 'debugAttachments']);
+
+    // Resolver routes
     Route::prefix('resolver')->group(function () {
         Route::get('/dashboard', [ResolverController::class, 'dashboard']);
         Route::get('/requests', [ResolverController::class, 'getAssignedRequestsList']);
@@ -45,7 +49,7 @@ Route::get('/developers', [AssignerController::class, 'getDevelopers']);
         Route::get('/statistics', [ResolverController::class, 'getStatistics']);
     });
 
-    // Admin routes (your existing routes)
+    // Admin routes
     Route::prefix('admin')->group(function () {
         Route::get('/dashboard', [AdminController::class, 'dashboard']);
         Route::get('/users', [AdminController::class, 'getUsers']);

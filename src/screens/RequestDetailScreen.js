@@ -8,17 +8,25 @@ import {
   TextInput,
   ScrollView,
   Alert,
+  Dimensions,
+  StatusBar,
+  DrawerLayoutAndroid
 } from 'react-native';
 import * as Animatable from 'react-native-animatable';
 import { useRoute, useNavigation } from '@react-navigation/native';
 import { useAuth } from '../context/AuthContext';
 import { Picker } from '@react-native-picker/picker';
+import LinearGradient from 'react-native-linear-gradient';
+import Icon from 'react-native-vector-icons/FontAwesome';
+
+const { width } = Dimensions.get('window');
 
 const RequestDetailScreen = () => {
   const route = useRoute();
   const navigation = useNavigation();
-  const { userApi, logout } = useAuth();
+  const { userApi, logout, user } = useAuth();
   const { requestId } = route.params;
+  const drawerRef = React.useRef(null);
 
   const [loading, setLoading] = useState(true);
   const [request, setRequest] = useState(null);
@@ -27,6 +35,101 @@ const RequestDetailScreen = () => {
   const [assignerComment, setAssignerComment] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState(null);
+
+  const openDrawer = () => {
+    drawerRef.current?.openDrawer();
+  };
+
+  const closeDrawer = () => {
+    drawerRef.current?.closeDrawer();
+  };
+
+  const handleLogout = async () => {
+    Alert.alert(
+      'Logout',
+      'Are you sure you want to logout?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Logout',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await logout();
+              navigation.navigate('Login');
+            } catch (error) {
+              Alert.alert('Error', 'Failed to logout');
+            }
+          }
+        }
+      ]
+    );
+  };
+
+  const navigationView = (
+    <View style={styles.drawerContainer}>
+      <LinearGradient
+        colors={['#2C3E50', '#4ECDC4']}
+        style={styles.drawerHeader}
+      >
+        <View style={styles.drawerHeaderContent}>
+          <View style={styles.userAvatar}>
+            <Icon name="user" size={40} color="#fff" />
+          </View>
+          <Text style={styles.drawerUserName}>
+            {user?.name || 'User'}
+          </Text>
+          <Text style={styles.drawerUserRole}>Assigner</Text>
+        </View>
+      </LinearGradient>
+
+      <View style={styles.drawerMenu}>
+        <TouchableOpacity 
+          style={styles.drawerItem}
+          onPress={() => {
+            closeDrawer();
+            navigation.navigate('AssignerDashboard');
+          }}
+        >
+          <Icon name="home" size={20} color="#2C3E50" />
+          <Text style={styles.drawerItemText}>Dashboard</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity 
+          style={styles.drawerItem}
+          onPress={() => {
+            closeDrawer();
+            // Add navigation for other screens
+          }}
+        >
+          <Icon name="list-alt" size={20} color="#2C3E50" />
+          <Text style={styles.drawerItemText}>Requests</Text>
+        </TouchableOpacity>
+
+        <View style={styles.drawerDivider} />
+
+        <TouchableOpacity 
+          style={styles.drawerItem}
+          onPress={() => {
+            closeDrawer();
+            // Add settings navigation here
+          }}
+        >
+        </TouchableOpacity>
+
+        <TouchableOpacity 
+          style={[styles.drawerItem, styles.logoutDrawerItem]}
+          onPress={() => {
+            closeDrawer();
+            handleLogout();
+          }}
+        >
+          <Icon name="sign-out" size={20} color="#e74c3c" />
+          <Text style={[styles.drawerItemText, styles.logoutText]}>Logout</Text>
+        </TouchableOpacity>
+      </View>
+    </View>
+  );
 
   const fetchRequestDetails = async (signal) => {
     try {
@@ -39,14 +142,13 @@ const RequestDetailScreen = () => {
         status: res.status,
       });
       
-      // Safe data access
       if (res.data?.success && Array.isArray(res.data.requests)) {
         const selected = res.data.requests.find(r => r.id === requestId);
         if (selected) {
           setRequest(selected);
           setAssignedTo(selected.assigned_to || '');
           setAssignerComment(selected.assigner_comment || '');
-          return true; // Success
+          return true;
         } else {
           setRequest(null);
           setError('Request not found.');
@@ -64,7 +166,6 @@ const RequestDetailScreen = () => {
         console.log('Details fetch error:', error.message);
         const errorMsg = error.response?.data?.message || error.message || 'Failed to load request details.';
         
-        // Handle specific errors without automatic logout
         if (error.response?.status === 401) {
           setError('Session expired. Please log in again.');
         } else if (error.response?.status === 404) {
@@ -90,18 +191,14 @@ const RequestDetailScreen = () => {
         status: res.status,
       });
       
-      // Safe data access with multiple fallbacks
       if (res.data?.success && Array.isArray(res.data.developers)) {
         const mappedDevelopers = res.data.developers
           .map(dev => {
-            // Try multiple possible ID fields
             const id = dev.id || dev.developer_id || dev.user_id;
-            // Try multiple possible name fields
             const name = dev.name || dev.full_name || dev.username || 'Unnamed Developer';
-            
             return id ? { id, name } : null;
           })
-          .filter(dev => dev !== null); // Remove null entries
+          .filter(dev => dev !== null);
           
         console.log('Mapped developers:', mappedDevelopers);
         setDevelopers(mappedDevelopers);
@@ -112,7 +209,6 @@ const RequestDetailScreen = () => {
     } catch (err) {
       if (err.name !== 'AbortError') {
         console.log('Developers fetch error:', err.message);
-        // Don't set error for developers fetch - it shouldn't block the main request
       }
     }
   };
@@ -126,10 +222,8 @@ const RequestDetailScreen = () => {
         setLoading(true);
         setError(null);
         
-        // First fetch request details
         const requestSuccess = await fetchRequestDetails(abortController.signal);
         
-        // Only fetch developers if request details were successful and component is still mounted
         if (requestSuccess && isMounted) {
           await fetchDevelopers(abortController.signal);
         }
@@ -196,7 +290,6 @@ const RequestDetailScreen = () => {
       console.log('Assign request error:', err.message);
       const errorMsg = err.response?.data?.message || err.message || 'Failed to assign request. Please try again.';
       
-      // Handle errors without automatic logout
       if (err.response?.status === 401) {
         setError('Session expired. Please log in again.');
       } else {
@@ -230,8 +323,8 @@ const RequestDetailScreen = () => {
   if (loading) {
     return (
       <View style={styles.loader}>
-        <ActivityIndicator size="large" color="#4ECDC4" />
-        <Text style={styles.loadingText}>Loading request details...</Text>
+        <ActivityIndicator size="large" color="#2C3E50" />
+        <Text style={styles.loadingText}>Loading Request Details...</Text>
       </View>
     );
   }
@@ -239,14 +332,38 @@ const RequestDetailScreen = () => {
   if (error && !request) {
     return (
       <View style={styles.container}>
+        <StatusBar backgroundColor="#2C3E50" barStyle="light-content" />
+        <View style={styles.navbar}>
+          <TouchableOpacity 
+            style={styles.menuButton}
+            onPress={() => navigation.goBack()}
+          >
+            <Icon name="arrow-left" size={24} color="#fff" />
+          </TouchableOpacity>
+          
+          <View style={styles.navbarCenter}>
+            <Text style={styles.navbarTitle}>Request Details</Text>
+          </View>
+          
+          <View style={styles.navbarRight}>
+            <TouchableOpacity style={styles.navbarIcon}>
+              <Icon name="user" size={20} color="#fff" />
+            </TouchableOpacity>
+          </View>
+        </View>
+
         <View style={styles.errorContainer}>
           <Text style={styles.errorTitle}>Error Loading Request</Text>
           <Text style={styles.errorText}>{error}</Text>
           <TouchableOpacity style={styles.retryButton} onPress={retryFetch}>
-            <Text style={styles.retryButtonText}>Retry</Text>
+            <LinearGradient colors={['#2C3E50', '#4ECDC4']} style={styles.buttonGradient}>
+              <Text style={styles.buttonText}>Retry</Text>
+            </LinearGradient>
           </TouchableOpacity>
           <TouchableOpacity style={styles.backButton} onPress={() => navigation.canGoBack() && navigation.goBack()}>
-            <Text style={styles.backButtonText}>Go Back</Text>
+            <LinearGradient colors={['#6B7280', '#9CA3AF']} style={styles.buttonGradient}>
+              <Text style={styles.buttonText}>Go Back</Text>
+            </LinearGradient>
           </TouchableOpacity>
         </View>
       </View>
@@ -256,21 +373,44 @@ const RequestDetailScreen = () => {
   if (!request) {
     return (
       <View style={styles.container}>
+        <StatusBar backgroundColor="#2C3E50" barStyle="light-content" />
+        <View style={styles.navbar}>
+          <TouchableOpacity 
+            style={styles.menuButton}
+            onPress={() => navigation.goBack()}
+          >
+            <Icon name="arrow-left" size={24} color="#fff" />
+          </TouchableOpacity>
+          
+          <View style={styles.navbarCenter}>
+            <Text style={styles.navbarTitle}>Request Details</Text>
+          </View>
+          
+          <View style={styles.navbarRight}>
+            <TouchableOpacity style={styles.navbarIcon}>
+              <Icon name="user" size={20} color="#fff" />
+            </TouchableOpacity>
+          </View>
+        </View>
+
         <View style={styles.errorContainer}>
           <Text style={styles.errorTitle}>Request Not Found</Text>
           <Text style={styles.errorText}>The requested change request could not be found.</Text>
           <TouchableOpacity style={styles.retryButton} onPress={retryFetch}>
-            <Text style={styles.retryButtonText}>Retry</Text>
+            <LinearGradient colors={['#2C3E50', '#4ECDC4']} style={styles.buttonGradient}>
+              <Text style={styles.buttonText}>Retry</Text>
+            </LinearGradient>
           </TouchableOpacity>
           <TouchableOpacity style={styles.backButton} onPress={() => navigation.canGoBack() && navigation.goBack()}>
-            <Text style={styles.backButtonText}>Go Back</Text>
+            <LinearGradient colors={['#6B7280', '#9CA3AF']} style={styles.buttonGradient}>
+              <Text style={styles.buttonText}>Go Back</Text>
+            </LinearGradient>
           </TouchableOpacity>
         </View>
       </View>
     );
   }
 
-  // Safe data access for request object
   const safeRequest = {
     project: request.project || { name: 'N/A' },
     user: request.user || { name: 'N/A' },
@@ -281,98 +421,143 @@ const RequestDetailScreen = () => {
   };
 
   return (
-    <Animatable.View animation="fadeIn" style={styles.container}>
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
-        {error && (
-          <View style={styles.inlineError}>
-            <Text style={styles.inlineErrorText}>{error}</Text>
-            <TouchableOpacity onPress={() => setError(null)}>
-              <Text style={styles.dismissText}>Dismiss</Text>
+    <DrawerLayoutAndroid
+      ref={drawerRef}
+      drawerWidth={300}
+      drawerPosition="left"
+      renderNavigationView={() => navigationView}
+    >
+      <View style={styles.container}>
+        <StatusBar backgroundColor="#2C3E50" barStyle="light-content" />
+        
+        {/* Top Navbar */}
+        <View style={styles.navbar}>
+          <TouchableOpacity 
+            style={styles.menuButton}
+            onPress={openDrawer}
+          >
+            <Icon name="bars" size={24} color="#fff" />
+          </TouchableOpacity>
+          
+          <View style={styles.navbarCenter}>
+            <Text style={styles.navbarTitle}>Request Details</Text>
+          </View>
+          
+          <View style={styles.navbarRight}>
+            <TouchableOpacity style={styles.navbarIcon}>
+              <Icon name="user" size={20} color="#fff" />
             </TouchableOpacity>
           </View>
-        )}
-
-        <Text style={styles.headerTitle}>Request Details</Text>
-
-        <View style={styles.detailBox}>
-          <Text style={styles.label}>Project:</Text>
-          <Text style={styles.value}>{safeRequest.project.name}</Text>
-
-          <Text style={styles.label}>User:</Text>
-          <Text style={styles.value}>{safeRequest.user.name}</Text>
-
-          <Text style={styles.label}>Query:</Text>
-          <Text style={styles.value}>{safeRequest.service.name}</Text>
-
-          <Text style={styles.label}>Priority:</Text>
-          <Text style={[styles.value, { color: priorityColor(safeRequest.priority) }]}>
-            {safeRequest.priority}
-          </Text>
-
-          <Text style={styles.label}>Status:</Text>
-          <Text style={[styles.value, { color: statusColor(safeRequest.status) }]}>
-            {safeRequest.status}
-          </Text>
-
-          <Text style={styles.label}>Request Details:</Text>
-          <Text style={styles.value}>{safeRequest.request_details}</Text>
-
-          <Text style={styles.label}>Assigned To:</Text>
-          <View style={styles.pickerContainer}>
-            <Picker
-              selectedValue={assignedTo}
-              onValueChange={setAssignedTo}
-              style={styles.picker}
-              dropdownIconColor="#FFFFFF"
-              enabled={developers.length > 0}
-            >
-              <Picker.Item label="Select a developer" value="" color="#FFFFFF" />
-              {developers.map(dev => (
-                <Picker.Item 
-                  key={dev.id} 
-                  label={dev.name} 
-                  value={dev.id} 
-                  color="#FFFFFF" 
-                />
-              ))}
-            </Picker>
-          </View>
-          {developers.length === 0 && (
-            <Text style={styles.errorText}>No developers available. Please try again later.</Text>
-          )}
-
-          <Text style={styles.label}>Assigner Comment:</Text>
-          <TextInput
-            value={assignerComment}
-            onChangeText={setAssignerComment}
-            placeholder="Enter your comment"
-            multiline
-            style={[styles.input, styles.textArea]}
-            placeholderTextColor="#999"
-          />
         </View>
 
-        <TouchableOpacity
-          style={[styles.assignBtn, (submitting || developers.length === 0) && styles.assignBtnDisabled]}
-          disabled={submitting || developers.length === 0}
-          onPress={handleAssign}
-        >
-          <Text style={styles.assignBtnText}>
-            {submitting ? 'Assigning...' : 'Assign Request'}
-          </Text>
-        </TouchableOpacity>
+        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
+         
 
-        {/* Space between buttons */}
-        <View style={styles.buttonSpacer} />
+          {/* Request Details Card */}
+          <View style={styles.detailCard}>
+            <Text style={styles.cardTitle}>Request Information</Text>
+            
+            <View style={styles.detailRow}>
+              <Text style={styles.label}>Project:</Text>
+              <Text style={styles.value}>{safeRequest.project.name}</Text>
+            </View>
 
-        <TouchableOpacity
-          style={styles.backButton}
-          onPress={() => navigation.canGoBack() && navigation.goBack()}
-        >
-          <Text style={styles.backButtonText}>Go Back</Text>
-        </TouchableOpacity>
-      </ScrollView>
-    </Animatable.View>
+            <View style={styles.detailRow}>
+              <Text style={styles.label}>User:</Text>
+              <Text style={styles.value}>{safeRequest.user.name}</Text>
+            </View>
+
+            <View style={styles.detailRow}>
+              <Text style={styles.label}>Service:</Text>
+              <Text style={styles.value}>{safeRequest.service.name}</Text>
+            </View>
+
+            <View style={styles.detailRow}>
+              <Text style={styles.label}>Priority:</Text>
+              <Text style={[styles.value, { color: priorityColor(safeRequest.priority) }]}>
+                {safeRequest.priority}
+              </Text>
+            </View>
+
+            <View style={styles.detailRow}>
+              <Text style={styles.label}>Status:</Text>
+              <Text style={[styles.value, { color: statusColor(safeRequest.status) }]}>
+                {safeRequest.status}
+              </Text>
+            </View>
+
+            <View style={styles.detailSection}>
+              <Text style={styles.label}>Request Details:</Text>
+              <Text style={styles.detailsText}>{safeRequest.request_details}</Text>
+            </View>
+          </View>
+
+          {/* Assignment Section */}
+          <View style={styles.detailCard}>
+            <Text style={styles.cardTitle}>Assignment</Text>
+
+            <View style={styles.detailSection}>
+              <Text style={styles.label}>Assign To Developer:</Text>
+              <View style={styles.pickerContainer}>
+                <Picker
+                  selectedValue={assignedTo}
+                  onValueChange={setAssignedTo}
+                  style={styles.picker}
+                  dropdownIconColor="#2C3E50"
+                  enabled={developers.length > 0}
+                >
+                  <Picker.Item label="Select a developer" value="" />
+                  {developers.map(dev => (
+                    <Picker.Item 
+                      key={dev.id} 
+                      label={dev.name} 
+                      value={dev.id} 
+                    />
+                  ))}
+                </Picker>
+              </View>
+              {developers.length === 0 && (
+                <Text style={styles.errorText}>No developers available. Please try again later.</Text>
+              )}
+            </View>
+
+            <View style={styles.detailSection}>
+              <Text style={styles.label}>Assigner Comment:</Text>
+              <TextInput
+                value={assignerComment}
+                onChangeText={setAssignerComment}
+                placeholder="Enter your comments for the developer..."
+                multiline
+                style={styles.textArea}
+                placeholderTextColor="#999"
+              />
+            </View>
+          </View>
+
+          {/* Action Buttons */}
+          <TouchableOpacity
+            style={[styles.assignBtn, (submitting || developers.length === 0) && styles.assignBtnDisabled]}
+            disabled={submitting || developers.length === 0}
+            onPress={handleAssign}
+          >
+            <LinearGradient colors={['#2C3E50', '#4ECDC4']} style={styles.buttonGradient}>
+              <Text style={styles.buttonText}>
+                {submitting ? 'Assigning...' : 'Assign Request'}
+              </Text>
+            </LinearGradient>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.backButton}
+            onPress={() => navigation.canGoBack() && navigation.goBack()}
+          >
+            <LinearGradient colors={['#6B7280', '#9CA3AF']} style={styles.buttonGradient}>
+              <Text style={styles.buttonText}>Go Back</Text>
+            </LinearGradient>
+          </TouchableOpacity>
+        </ScrollView>
+      </View>
+    </DrawerLayoutAndroid>
   );
 };
 
@@ -397,8 +582,7 @@ const priorityColor = (priority) => {
 const styles = StyleSheet.create({
   container: { 
     flex: 1, 
-    backgroundColor: '#E6FFFA', 
-    padding: 15 
+    backgroundColor: '#F8FAFC',
   },
   scrollContent: {
     flexGrow: 1,
@@ -408,109 +592,171 @@ const styles = StyleSheet.create({
     flex: 1, 
     justifyContent: 'center', 
     alignItems: 'center',
-    backgroundColor: '#E6FFFA',
+    backgroundColor: '#F8FAFC',
   },
   loadingText: {
     marginTop: 10,
     fontSize: 16,
-    color: '#374151',
-  },
-  headerTitle: { 
-    fontSize: 22, 
-    fontWeight: '700', 
-    marginBottom: 15, 
-    textAlign: 'center',
     color: '#2C3E50',
   },
-  detailBox: {
-    backgroundColor: '#fff',
-    borderRadius: 16,
-    padding: 20,
+  
+  // Navbar Styles
+  navbar: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    backgroundColor: '#2C3E50',
+    paddingHorizontal: 16,
+    paddingTop: 35,
+    paddingBottom: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: '#34495e',
     shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+    elevation: 5,
+  },
+  menuButton: {
+    padding: 8,
+  },
+  navbarCenter: {
+    flex: 1,
+    alignItems: 'center',
+  },
+  navbarTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#fff',
+  },
+  navbarRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  navbarIcon: {
+    padding: 8,
+  },
+
+
+  // Detail Card
+  detailCard: {
+    backgroundColor: '#fff',
+    borderRadius: 20,
+    padding: 25,
+    margin: 20,
+    marginBottom: 15,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
+    shadowRadius: 12,
+    elevation: 5,
+  },
+  cardTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#2C3E50',
+    marginBottom: 20,
+    textAlign: 'center',
+  },
+  detailRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 15,
+    paddingBottom: 15,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f1f5f9',
+  },
+  detailSection: {
     marginBottom: 20,
   },
   label: { 
     fontWeight: '600', 
-    marginTop: 12, 
     color: '#374151',
     fontSize: 14,
+    flex: 1,
   },
   value: { 
     fontSize: 16, 
     color: '#111827', 
-    marginTop: 4,
-    marginBottom: 8,
+    fontWeight: '500',
+    flex: 1,
+    textAlign: 'right',
   },
-  input: {
-    backgroundColor: '#F9FAFB',
+  detailsText: {
+    fontSize: 16,
+    color: '#374151',
+    lineHeight: 24,
+    marginTop: 8,
+    backgroundColor: '#f8fafc',
+    padding: 15,
     borderRadius: 10,
-    padding: 12,
-    marginTop: 6,
+    borderLeftWidth: 4,
+    borderLeftColor: '#4ECDC4',
+  },
+
+  // Input and Picker
+  textArea: {
+    backgroundColor: '#F9FAFB',
+    borderRadius: 12,
+    padding: 15,
+    marginTop: 8,
     borderWidth: 1,
     borderColor: '#E5E7EB',
     fontSize: 16,
     color: '#000000',
-  },
-  textArea: {
-    height: 80,
+    height: 100,
     textAlignVertical: 'top',
   },
-  // Picker styling with dark background for white text visibility
   pickerContainer: {
-    backgroundColor: '#374151',
-    borderRadius: 10,
-    marginTop: 6,
+    backgroundColor: '#F9FAFB',
+    borderRadius: 12,
+    marginTop: 8,
     borderWidth: 1,
-    borderColor: '#4B5563',
+    borderColor: '#E5E7EB',
     overflow: 'hidden',
   },
   picker: {
-    color: '#FFFFFF',
     height: 50,
   },
-  assignBtn: {
-    backgroundColor: '#4ECDC4',
+
+  // Buttons
+  buttonGradient: {
     padding: 16,
     borderRadius: 12,
     alignItems: 'center',
-    marginTop: 10,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
   },
-  assignBtnDisabled: {
-    opacity: 0.6,
-  },
-  assignBtnText: { 
-    color: 'white', 
-    fontSize: 16, 
-    fontWeight: '700' 
-  },
-  // Space between buttons
-  buttonSpacer: {
-    height: 20,
-  },
-  backButton: {
-    backgroundColor: '#6B7280',
-    padding: 16,
-    borderRadius: 12,
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  backButtonText: {
+  buttonText: {
     color: 'white',
     fontSize: 16,
     fontWeight: '600',
   },
+  assignBtn: {
+    marginHorizontal: 20,
+    marginBottom: 12,
+    borderRadius: 12,
+    overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 5,
+  },
+  assignBtnDisabled: {
+    opacity: 0.6,
+  },
+  backButton: {
+    marginHorizontal: 20,
+    borderRadius: 12,
+    overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+
+  // Error States
   errorContainer: {
     flex: 1,
     justifyContent: 'center',
@@ -525,18 +771,18 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   errorText: {
-    fontSize: 16,
+    fontSize: 14,
     color: '#DC2626',
     textAlign: 'center',
-    marginBottom: 20,
-    lineHeight: 22,
+    marginTop: 5,
     fontStyle: 'italic',
   },
   inlineError: {
     backgroundColor: '#FEE2E2',
     padding: 15,
     borderRadius: 10,
-    marginBottom: 15,
+    margin: 20,
+    marginBottom: 10,
     borderLeftWidth: 4,
     borderLeftColor: '#DC2626',
   },
@@ -551,18 +797,69 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     textAlign: 'right',
   },
-  retryButton: {
-    backgroundColor: '#4ECDC4',
-    padding: 12,
-    borderRadius: 8,
-    marginBottom: 10,
-    minWidth: 100,
+
+  // Drawer Styles
+  drawerContainer: {
+    flex: 1,
+    backgroundColor: '#fff',
+  },
+  drawerHeader: {
+    padding: 20,
+    paddingTop: 60,
+    paddingBottom: 30,
+  },
+  drawerHeaderContent: {
     alignItems: 'center',
   },
-  retryButtonText: {
-    color: 'white',
+  userAvatar: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 15,
+  },
+  drawerUserName: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#fff',
+    marginBottom: 5,
+  },
+  drawerUserRole: {
+    fontSize: 14,
+    color: '#fff',
+    opacity: 0.8,
+  },
+  drawerMenu: {
+    flex: 1,
+    padding: 20,
+  },
+  drawerItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 15,
+    paddingHorizontal: 10,
+    borderRadius: 8,
+    marginBottom: 5,
+  },
+  drawerItemText: {
     fontSize: 16,
-    fontWeight: '600',
+    color: '#2C3E50',
+    marginLeft: 15,
+    fontWeight: '500',
+  },
+  drawerDivider: {
+    height: 1,
+    backgroundColor: '#ecf0f1',
+    marginVertical: 15,
+  },
+  logoutDrawerItem: {
+    marginTop: 'auto',
+    marginBottom: 20,
+  },
+  logoutText: {
+    color: '#e74c3c',
   },
 });
 
