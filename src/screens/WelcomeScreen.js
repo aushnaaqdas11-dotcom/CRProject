@@ -206,12 +206,12 @@ const WelcomeScreen = ({ navigation, route }) => {
               <View style={styles.logosWrapper}>
                 <Image 
                   source={require('../assets/images/PITBLOGO.png')} 
-                  style={styles.pitbLogo} 
+                  style={styles.navpitbLogo} 
                   resizeMode="contain" 
                 />
                 <Image 
                   source={require('../assets/images/crp.png')} 
-                  style={styles.crpLogo} 
+                  style={styles.navcrpLogo} 
                   resizeMode="contain" 
                 />
               </View>
@@ -261,7 +261,19 @@ const WelcomeScreen = ({ navigation, route }) => {
             style={styles.heroBackgroundImage}
             resizeMode="cover"
           />
-          
+              <View style={styles.logosWrapper}>
+                <Image 
+                  source={require('../assets/images/PITBLOGO.png')} 
+                  style={styles.pitbLogo} 
+                  resizeMode="contain" 
+                />
+                <Image 
+                  source={require('../assets/images/crp.png')} 
+                  style={styles.crpLogo} 
+                  resizeMode="contain" 
+                />
+              </View>
+            
           <Animated.View style={[styles.heroContent, { opacity: fadeAnim, transform: [{ translateY: slideUpAnim }] }]}>
             <Text style={styles.heroTitle}>
               Streamline Your{'\n'}
@@ -287,6 +299,7 @@ const WelcomeScreen = ({ navigation, route }) => {
 
           <Animated.View style={[styles.floatingElement, styles.floating1, { transform: [{ translateY: translateY1 }] }]} />
           <Animated.View style={[styles.floatingElement, styles.floating2, { transform: [{ translateY: translateY2 }] }]} />
+       
         </LinearGradient>
 
         {/* Stats Section */}
@@ -427,8 +440,8 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1, 
     borderBottomColor: '#e0e0e0', 
     paddingHorizontal: 16,
-    paddingTop: 50,
-    paddingBottom: 10,
+    paddingTop: 40,
+    paddingBottom: 7,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
@@ -448,26 +461,36 @@ const styles = StyleSheet.create({
     paddingHorizontal: 15,
     paddingVertical: 5,
   },
-  logosWrapper: {
+  navpitbLogo: {
+    width: 35,
+    height: 35,
+    marginRight: 10,
+  },
+  navcrpLogo: {
+    width: 45,
+    height: 35,
+  },
+  logosWrapper: { 
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
   },
   pitbLogo: {
-    width: 35,
-    height: 35,
-    marginRight: 10,
+   width: width * 0.25,
+    height: width * 0.25,
+    zIndex: 2,
   },
   crpLogo: {
-    width: 45,
-    height: 35,
+    width: width * 0.25,
+    height: width * 0.25,
+    zIndex: 2,
   },
   navLinks: { 
     flexDirection: 'row', 
     alignItems: 'center',
   },
   navButton: { 
-    paddingHorizontal: 9,
+    paddingHorizontal: 4,
     paddingVertical: 6,
     marginLeft: 8,
   },
@@ -494,7 +517,7 @@ const styles = StyleSheet.create({
     flexGrow: 1,
   },
   heroSection: { 
-    minHeight: height * 0.7, 
+    minHeight: height * 0.9, 
     justifyContent: 'center', 
     alignItems: 'center', 
     position: 'relative',

@@ -184,6 +184,7 @@ const RolesManagement = ({ navigation }) => {
         <TextInput
           style={styles.searchInput}
           placeholder="Search for roles..."
+          placeholderTextColor='#a39f9fff'
           value={searchQuery}
           onChangeText={handleSearch}
         />

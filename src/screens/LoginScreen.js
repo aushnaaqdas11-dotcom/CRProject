@@ -12,12 +12,64 @@ import {
   Alert,
   Animated,
   Image,
-  ActivityIndicator
+  ActivityIndicator,
+  ImageBackground
 } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import LinearGradient from 'react-native-linear-gradient';
 import Icon from 'react-native-vector-icons/FontAwesome';
 import { Colors } from '../styles/theme';
 import { useAuth } from '../context/AuthContext';
+
+// WigglyChar component
+const WigglyChar = ({ char }) => {
+  const rotation = useRef(new Animated.Value(Math.random() * 20 - 10)).current;
+
+  useEffect(() => {
+    const animate = () => {
+      Animated.sequence([
+        Animated.timing(rotation, { toValue: Math.random() * 40 - 20, duration: 2000, useNativeDriver: true }),
+        Animated.timing(rotation, { toValue: Math.random() * 40 - 20, duration: 2000, useNativeDriver: true }),
+      ]).start(() => animate());
+    };
+    animate();
+  }, [rotation]);
+
+  return (
+    <Animated.Text
+      style={{
+        fontSize: 32,
+        fontWeight: 'bold',
+        color: '#4ECDC4',
+        marginHorizontal: 2,
+        fontFamily: 'monospace',
+        transform: [{ rotate: rotation.interpolate({ inputRange: [-20, 20], outputRange: ['-20deg', '20deg'] }) }]
+      }}
+    >
+      {char}
+    </Animated.Text>
+  );
+};
+
+// EmailSuggestions component - Fixed to not use FlatList
+const EmailSuggestions = ({ emails, onEmailSelect, visible }) => {
+  if (!visible || emails.length === 0) return null;
+
+  return (
+    <View style={styles.suggestionsContainer}>
+      {emails.map((email, index) => (
+        <TouchableOpacity
+          key={index}
+          style={styles.suggestionItem}
+          onPress={() => onEmailSelect(email)}
+        >
+          <Icon name="envelope" size={16} color="#666" style={styles.suggestionIcon} />
+          <Text style={styles.suggestionText}>{email}</Text>
+        </TouchableOpacity>
+      ))}
+    </View>
+  );
+};
 
 const LoginScreen = ({ navigation }) => {
   const [login, setLogin] = useState('');
@@ -26,9 +78,41 @@ const LoginScreen = ({ navigation }) => {
   const [captchaText, setCaptchaText] = useState('');
   const [userCaptcha, setUserCaptcha] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [rememberMe, setRememberMe] = useState(false);
+  const [savedEmails, setSavedEmails] = useState([]);
+  const [showEmailSuggestions, setShowEmailSuggestions] = useState(false);
 
   const shakeAnimation = useRef(new Animated.Value(0)).current;
   const { login: authLogin } = useAuth();
+
+  // Initialize component
+  useEffect(() => {
+    loadSavedEmails();
+    generateCaptcha();
+  }, []);
+
+  const loadSavedEmails = async () => {
+    try {
+      const saved = await AsyncStorage.getItem('savedEmails');
+      if (saved) {
+        setSavedEmails(JSON.parse(saved));
+      }
+    } catch (error) {
+      console.log('Error loading saved emails:', error);
+    }
+  };
+
+  const saveEmail = async (email) => {
+    try {
+      if (email && !savedEmails.includes(email)) {
+        const updatedEmails = [...savedEmails, email];
+        setSavedEmails(updatedEmails);
+        await AsyncStorage.setItem('savedEmails', JSON.stringify(updatedEmails));
+      }
+    } catch (error) {
+      console.log('Error saving email:', error);
+    }
+  };
 
   const generateCaptcha = () => {
     const characters = 'ABCDEFGHJKLMNPQRSTUVWXYZ0123456789';
@@ -49,6 +133,11 @@ const LoginScreen = ({ navigation }) => {
       Animated.timing(shakeAnimation, { toValue: 10, duration: 100, useNativeDriver: true }),
       Animated.timing(shakeAnimation, { toValue: 0, duration: 100, useNativeDriver: true })
     ]).start();
+  };
+
+  const handleEmailSelect = (email) => {
+    setLogin(email);
+    setShowEmailSuggestions(false);
   };
 
   const handleLogin = async () => {
@@ -72,6 +161,11 @@ const LoginScreen = ({ navigation }) => {
       console.log("Login result:", result);
 
       if (result.success) {
+        // Save email to suggestions when remember me is checked
+        if (rememberMe) {
+          await saveEmail(login);
+        }
+        
         const role = parseInt(result.user?.role);
         console.log("User role:", role);
 
@@ -110,51 +204,35 @@ const LoginScreen = ({ navigation }) => {
     }
   };
 
-  useEffect(() => { generateCaptcha(); }, []);
-
-  const WigglyChar = ({ char }) => {
-    const rotation = useRef(new Animated.Value(Math.random() * 20 - 10)).current;
-
-    useEffect(() => {
-      const animate = () => {
-        Animated.sequence([
-          Animated.timing(rotation, { toValue: Math.random() * 40 - 20, duration: 2000, useNativeDriver: true }),
-          Animated.timing(rotation, { toValue: Math.random() * 40 - 20, duration: 2000, useNativeDriver: true }),
-        ]).start(() => animate());
-      };
-      animate();
-    }, []);
-
-    return (
-      <Animated.Text
-        style={{
-          fontSize: 32,
-          fontWeight: 'bold',
-          color: '#2a5298',
-          marginHorizontal: 2,
-          fontFamily: 'monospace',
-          transform: [{ rotate: rotation.interpolate({ inputRange: [-20, 20], outputRange: ['-20deg', '20deg'] }) }]
-        }}
-      >
-        {char}
-      </Animated.Text>
-    );
-  };
+  const filteredEmails = savedEmails.filter(email => 
+    email.toLowerCase().includes(login.toLowerCase())
+  );
 
   return (
     <KeyboardAvoidingView
       style={styles.container}
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
-      <StatusBar barStyle="light-content" translucent backgroundColor="transparent" />
+      <StatusBar barStyle="light-content" backgroundColor={Colors.primary} />
 
-      {/* Navbar - Same as WelcomeScreen */}
-      <View style={styles.navbar}>
-        <View style={styles.navbarContent}>
-          {/* Logo Section - Same as WelcomeScreen */}
-          <TouchableOpacity style={styles.logoContainer}>
-            <LinearGradient colors={[Colors.primary, Colors.secondary]} style={styles.logoGradient}>
-              <View style={styles.logosWrapper}>
+      {/* Background Image Container */}
+      <ImageBackground 
+        source={require('../assets/images/LoginArfa.jpg')} 
+        style={styles.backgroundImage}
+        resizeMode="cover"
+      >
+        <LinearGradient 
+          colors={['rgba(44, 62, 80, 0.7)', '#3b9b94ff']} 
+          style={styles.overlay}
+        >
+          <ScrollView 
+            contentContainerStyle={styles.scrollContent} 
+            keyboardShouldPersistTaps="handled"
+            showsVerticalScrollIndicator={false}
+          >
+            {/* Logo Section */}
+            <View style={styles.logoSection}>
+              <View style={styles.logoContainer}>
                 <Image 
                   source={require('../assets/images/PITBLOGO.png')} 
                   style={styles.pitbLogo} 
@@ -166,54 +244,38 @@ const LoginScreen = ({ navigation }) => {
                   resizeMode="contain" 
                 />
               </View>
-            </LinearGradient>
-          </TouchableOpacity>
+              <Text style={styles.welcomeTitle}>Change Request Portal</Text>
+              <Text style={styles.welcomeSubtitle}>Government of the Punjab</Text>
+            </View>
 
-          {/* Navigation Links - Same as WelcomeScreen */}
-          <View style={styles.navLinks}>
-            <TouchableOpacity onPress={() => navigation.navigate('Welcome', { scrollTo: 'services' })} style={styles.navButton}>
-              <Text style={styles.navButtonText}>Services</Text>
-            </TouchableOpacity>
-            
-            <TouchableOpacity onPress={() => navigation.navigate('Welcome', { scrollTo: 'projects' })} style={styles.navButton}>
-              <Text style={styles.navButtonText}>Projects</Text>
-            </TouchableOpacity>
-            
-            <TouchableOpacity>
-              <LinearGradient
-                colors={[Colors.primary, Colors.secondary]}
-                style={styles.signInButton}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 1 }}
-              >
-                <Text style={styles.signInButtonText}>Sign In</Text>
-              </LinearGradient>
-            </TouchableOpacity>
-          </View>
-        </View>
-      </View>
-
-      {/* Main Login */}
-      <LinearGradient colors={[Colors.dark, Colors.primary, Colors.dark]} style={styles.background}>
-        <ScrollView contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled">
-          <View style={styles.signInContainer}>
+            {/* Login Card - Now with transparent background to show image behind */}
             <Animated.View style={[styles.cardContainer, { transform: [{ translateX: shakeAnimation }] }]}>
-              <LinearGradient colors={['#ffffff', '#f8f9fa', '#ffffff']} style={styles.cardGradient}>
-
+              <View style={styles.card}>
                 <View style={styles.header}>
                   <Text style={styles.title}>Sign In to CRP</Text>
                   <Text style={styles.subtitle}>Access Your Change Request Portal</Text>
                 </View>
 
-                <View style={styles.inputWrapper}>
-                  <Icon name="user" size={20} color={Colors.secondary} style={styles.inputIcon} />
-                  <TextInput
-                    style={styles.input}
-                    placeholder="Email or CNIC"
-                    placeholderTextColor="#666"
-                    value={login}
-                    onChangeText={setLogin}
-                    autoCapitalize="none"
+                {/* Email Input with Suggestions */}
+                <View style={styles.inputContainer}>
+                  <View style={styles.inputWrapper}>
+                    <Icon name="user" size={20} color={Colors.secondary} style={styles.inputIcon} />
+                    <TextInput
+                      style={styles.input}
+                      placeholder="Email or CNIC"
+                      placeholderTextColor="#666"
+                      value={login}
+                      onChangeText={setLogin}
+                      onFocus={() => setShowEmailSuggestions(true)}
+                      onBlur={() => setTimeout(() => setShowEmailSuggestions(false), 200)}
+                      autoCapitalize="none"
+                    />
+                  </View>
+
+                  <EmailSuggestions
+                    emails={filteredEmails}
+                    onEmailSelect={handleEmailSelect}
+                    visible={showEmailSuggestions && filteredEmails.length > 0}
                   />
                 </View>
 
@@ -232,6 +294,17 @@ const LoginScreen = ({ navigation }) => {
                   </TouchableOpacity>
                 </View>
 
+                {/* Remember Me */}
+                <View style={styles.rememberMeContainer}>
+                  <TouchableOpacity 
+                    style={[styles.checkbox, rememberMe && styles.checkboxChecked]}
+                    onPress={() => setRememberMe(!rememberMe)}
+                  >
+                    {rememberMe && <Icon name="check" size={12} color="#fff" />}
+                  </TouchableOpacity>
+                  <Text style={styles.rememberMeText}>Remember me</Text>
+                </View>
+
                 {/* CAPTCHA */}
                 <View style={styles.captchaContainer}>
                   <View style={styles.captchaHeader}>
@@ -239,14 +312,16 @@ const LoginScreen = ({ navigation }) => {
                   </View>
                   <View style={styles.captchaDisplay}>
                     <View style={styles.captchaTextContainer}>
-                      {captchaText.split('').map((char, index) => <WigglyChar key={index} char={char} />)}
+                      {captchaText.split('').map((char, index) => (
+                        <WigglyChar key={index} char={char} />
+                      ))}
                     </View>
                   </View>
                   <Text style={styles.captchaInstruction}>Type the code you see above:</Text>
                   <View style={styles.captchaInputWrapper}>
                     <TextInput
                       style={styles.captchaInput}
-                      placeholder="Enter CAPTCHA code"
+                      placeholder="Enter CAPTCHA"
                       placeholderTextColor="#666"
                       value={userCaptcha}
                       onChangeText={setUserCaptcha}
@@ -269,110 +344,83 @@ const LoginScreen = ({ navigation }) => {
                   </LinearGradient>
                 </TouchableOpacity>
 
-              </LinearGradient>
+                {/* Forgot Password */}
+                <TouchableOpacity style={styles.forgotPasswordContainer}>
+                  <Text style={styles.forgotPasswordText}>Forgot Password?</Text>
+                </TouchableOpacity>
+              </View>
             </Animated.View>
-          </View>
-        </ScrollView>
+          </ScrollView>
 
-        {/* Footer - Same as WelcomeScreen */}
-        <View style={styles.footer}>
-          <View style={styles.footerContent}>
-            <View style={styles.footerLogoContainer}>
-              <Image 
-                source={require('../assets/images/PITBLOGO.png')} 
-                style={styles.footerLogo} 
-                resizeMode="contain" 
-              />
-              <Text style={styles.footerText}>A project of Government of the Punjab</Text>
+          {/* Footer */}
+          <View style={styles.footer}>
+            <View style={styles.footerContent}>
+              <View style={styles.footerLogoContainer}>
+                <Image 
+                  source={require('../assets/images/PITBLOGO.png')} 
+                  style={styles.footerLogo} 
+                  resizeMode="contain" 
+                />
+                <Text style={styles.footerText}>A project of Government of the Punjab</Text>
+              </View>
             </View>
           </View>
-        </View>
-      </LinearGradient>
+        </LinearGradient>
+      </ImageBackground>
     </KeyboardAvoidingView>
   );
 };
 
 const styles = StyleSheet.create({
-  container: { flex: 1 },
-  background: { flex: 1 },
-  
-  // Navbar Styles - Same as WelcomeScreen
-  navbar: { 
-    backgroundColor: Colors.white, 
-    borderBottomWidth: 1, 
-    borderBottomColor: '#e0e0e0', 
-    paddingHorizontal: 16,
-    paddingTop: 50,
-    paddingBottom: 10,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 3,
-    elevation: 3,
+  container: { 
+    flex: 1,
   },
-  navbarContent: { 
-    flexDirection: 'row', 
-    justifyContent: 'space-between', 
-    alignItems: 'center',
+  backgroundImage: {
+    flex: 1,
+    width: '100%',
+    height: '100%',
   },
-  logoContainer: {
-    borderRadius: 8,
-    overflow: 'hidden',
+  overlay: {
+    flex: 1,
+    backgroundColor: 'rgba(78, 205, 197, 0.2)',
   },
-  logoGradient: {
-    paddingHorizontal: 15,
-    paddingVertical: 5,
-  },
-  logosWrapper: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  pitbLogo: {
-    width: 35,
-    height: 35,
-    marginRight: 10,
-  },
-  crpLogo: {
-    width: 45,
-    height: 35,
-  },
-  navLinks: { 
-    flexDirection: 'row', 
-    alignItems: 'center',
-  },
-  navButton: { 
-    paddingHorizontal: 9,
-    paddingVertical: 6,
-    marginLeft: 8,
-  },
-  navButtonText: { 
-    fontSize: 14, 
-    fontWeight: '600', 
-    color: Colors.primary,
-  },
-  signInButton: {
-    borderRadius: 6,
-    paddingHorizontal: 13,
-    paddingVertical: 8,
-    marginLeft: 12,
-  },
-  signInButtonText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: Colors.white,
-  },
-
-  // Main Content Styles (unchanged)
   scrollContent: {
     flexGrow: 1,
     justifyContent: 'center',
     padding: 20,
   },
-  signInContainer: {
-    flex: 1,
-    justifyContent: 'center',
+  logoSection: {
     alignItems: 'center',
+    marginBottom: 30,
+    marginTop: 20,
+  },
+  logoContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 15,
+    marginTop: 10,
+  },
+  pitbLogo: {
+    width: 60,
+    height: 60,
+    marginRight: 15,
+  },
+  crpLogo: {
+    width: 80,
+    height: 60,
+  },
+  welcomeTitle: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: '#fff',
+    marginBottom: 3,
+    textAlign: 'center',
+  },
+  welcomeSubtitle: {
+    fontSize: 16,
+    color: 'rgba(255,255,255,0.9)',
+    textAlign: 'center',
   },
   cardContainer: {
     borderRadius: 20,
@@ -384,9 +432,14 @@ const styles = StyleSheet.create({
     elevation: 10,
     width: '100%',
     maxWidth: 400,
+    alignSelf: 'center',
   },
-  cardGradient: {
+  card: {
+    backgroundColor: 'rgba(255, 255, 255, 0.95)',
+    borderRadius: 20,
     padding: 30,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.3)',
   },
   header: { 
     alignItems: 'center', 
@@ -395,7 +448,7 @@ const styles = StyleSheet.create({
   title: { 
     fontSize: 26, 
     fontWeight: 'bold', 
-    color: '#2a5298',
+    color: '#4ECDC4',
     marginBottom: 8,
     textAlign: 'center',
   },
@@ -403,6 +456,10 @@ const styles = StyleSheet.create({
     fontSize: 14, 
     color: '#666',
     textAlign: 'center',
+  },
+  inputContainer: {
+    position: 'relative',
+    marginBottom: 2,
   },
   inputWrapper: {
     flexDirection: 'row',
@@ -427,6 +484,71 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
   },
   inputIcon: { marginRight: 10 },
+  suggestionsContainer: {
+    position: 'absolute',
+    top: 55,
+    left: 0,
+    right: 0,
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#ddd',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 8,
+    elevation: 5,
+    zIndex: 1000,
+    maxHeight: 150,
+  },
+  suggestionItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f0f0f0',
+  },
+  suggestionIcon: {
+    marginRight: 10,
+  },
+  suggestionText: {
+    fontSize: 14,
+    color: '#333',
+  },
+  rememberMeContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 20,
+    marginTop: 5,
+  },
+  checkbox: {
+    width: 18,
+    height: 18,
+    borderWidth: 1,
+    borderColor: '#ced4da',
+    borderRadius: 3,
+    marginRight: 8,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#f8f9fa',
+  },
+  checkboxChecked: {
+    backgroundColor: "#4ECDC4",
+    borderColor: '#666',
+  },
+  rememberMeText: {
+    fontSize: 14,
+    color: '#666',
+  },
+  forgotPasswordContainer: {
+    alignItems: 'center',
+    marginTop: 10,
+  },
+  forgotPasswordText: {
+    fontSize: 14,
+    color: Colors.primary,
+    fontWeight: '500',
+  },
   captchaContainer: {
     marginBottom: 20,
     backgroundColor: '#f8f9fa',
@@ -441,7 +563,7 @@ const styles = StyleSheet.create({
   captchaTitle: {
     fontSize: 14,
     fontWeight: 'bold',
-    color: '#2a5298',
+    color: '#4ECDC4  ',
     textAlign: 'center',
   },
   captchaDisplay: {
@@ -449,7 +571,7 @@ const styles = StyleSheet.create({
     padding: 20,
     borderRadius: 8,
     borderWidth: 2,
-    borderColor: '#2a5298',
+    borderColor: '#4ECDC4  ',
     borderStyle: 'dashed',
     marginBottom: 10,
     alignItems: 'center',
@@ -520,8 +642,6 @@ const styles = StyleSheet.create({
     fontSize: 18, 
     fontWeight: '600' 
   },
-
-  // Footer Styles - Same as WelcomeScreen
   footer: {
     backgroundColor: Colors.white,
     borderTopWidth: 1,

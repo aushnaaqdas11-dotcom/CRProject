@@ -172,6 +172,7 @@ const AssignProjects = ({ navigation }) => {
         <TextInput
           style={styles.searchInput}
           placeholder="Search users..."
+          placeholderTextColor='#918f8fff'
           value={searchQuery}
           onChangeText={handleSearch}
         />

@@ -406,14 +406,7 @@ const ResolverRequestDetail = ({ route, navigation }) => {
                   </LinearGradient>
                 </TouchableOpacity>
 
-                <TouchableOpacity
-                  style={styles.backButton}
-                  onPress={() => navigation.goBack()}
-                >
-                  <LinearGradient colors={['#6B7280', '#9CA3AF']} style={styles.buttonGradient}>
-                    <Text style={styles.buttonText}>Go Back</Text>
-                  </LinearGradient>
-                </TouchableOpacity>
+               
               </>
             )}
           </ScrollView>
@@ -626,16 +619,7 @@ const styles = StyleSheet.create({
   assignBtnDisabled: {
     opacity: 0.6,
   },
-  backButton: {
-    marginHorizontal: 20,
-    borderRadius: 12,
-    overflow: 'hidden',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
-  },
+  
 
   // Modal Styles
   modalOverlay: {

@@ -100,10 +100,57 @@ const ManageUsers = ({ navigation }) => {
     }
   };
 
+  // Function to get role name with multiple fallbacks
+  const getRoleName = (user) => {
+    if (user.role_data && user.role_data.name) {
+      return user.role_data.name;
+    }
+    if (user.role_name) {
+      return user.role_name;
+    }
+    if (user.role) {
+      // Map role IDs to names
+      const roleMap = {
+        1: 'Admin',
+        2: 'User',
+        3: 'Developer',
+        4: 'Resolver',
+        5: 'Assigner'
+      };
+      return roleMap[user.role] || `Role ${user.role}`;
+    }
+    return 'Unknown';
+  };
+
+  // Pagination handlers
+  const goToFirstPage = () => {
+    if (pagination.current_page > 1) {
+      loadUsers(1, searchQuery);
+    }
+  };
+
+  const goToPreviousPage = () => {
+    if (pagination.current_page > 1) {
+      loadUsers(pagination.current_page - 1, searchQuery);
+    }
+  };
+
+  const goToNextPage = () => {
+    if (pagination.current_page < pagination.last_page) {
+      loadUsers(pagination.current_page + 1, searchQuery);
+    }
+  };
+
+  const goToLastPage = () => {
+    if (pagination.current_page < pagination.last_page) {
+      loadUsers(pagination.last_page, searchQuery);
+    }
+  };
+
   const renderUserItem = ({ item, index }) => (
     <View style={styles.userCard}>
       <View style={styles.userHeader}>
-        <Text style={styles.userSerial}>{index + 1}</Text>
+        <Text style={styles.userSerial}>{(pagination.current_page - 1) * 10 + index + 1}</Text>
         <Text style={styles.userName}>{item.name}</Text>
       </View>
       
@@ -123,7 +170,7 @@ const ManageUsers = ({ navigation }) => {
         <View style={styles.detailRow}>
           <Text style={styles.detailLabel}>Role:</Text>
           <Text style={[styles.detailValue, styles.roleText]}>
-            {item.role_data?.name || 'Unknown'}
+            {getRoleName(item)}
           </Text>
         </View>
       </View>
@@ -179,6 +226,7 @@ const ManageUsers = ({ navigation }) => {
         <TextInput
           style={styles.searchInput}
           placeholder="Search users by name, email, CNIC..."
+          placeholderTextColor='#858181ff'
           value={searchQuery}
           onChangeText={handleSearch}
         />
@@ -208,12 +256,62 @@ const ManageUsers = ({ navigation }) => {
         contentContainerStyle={styles.listContent}
       />
 
-      {/* Pagination */}
+      {/* Pagination Controls */}
       {pagination && pagination.total > 0 && (
-        <View style={styles.pagination}>
+        <View style={styles.paginationContainer}>
           <Text style={styles.paginationText}>
             Showing {pagination.from}-{pagination.to} of {pagination.total} users
           </Text>
+          
+          <View style={styles.paginationControls}>
+            <TouchableOpacity 
+              style={[
+                styles.paginationButton,
+                pagination.current_page === 1 && styles.paginationButtonDisabled
+              ]}
+              onPress={goToFirstPage}
+              disabled={pagination.current_page === 1}
+            >
+              <Icon name="step-backward" size={14} color={pagination.current_page === 1 ? "#ccc" : "#2C3E50"} />
+            </TouchableOpacity>
+            
+            <TouchableOpacity 
+              style={[
+                styles.paginationButton,
+                pagination.current_page === 1 && styles.paginationButtonDisabled
+              ]}
+              onPress={goToPreviousPage}
+              disabled={pagination.current_page === 1}
+            >
+              <Icon name="chevron-left" size={14} color={pagination.current_page === 1 ? "#ccc" : "#2C3E50"} />
+            </TouchableOpacity>
+            
+            <Text style={styles.pageIndicator}>
+              Page {pagination.current_page} of {pagination.last_page}
+            </Text>
+            
+            <TouchableOpacity 
+              style={[
+                styles.paginationButton,
+                pagination.current_page === pagination.last_page && styles.paginationButtonDisabled
+              ]}
+              onPress={goToNextPage}
+              disabled={pagination.current_page === pagination.last_page}
+            >
+              <Icon name="chevron-right" size={14} color={pagination.current_page === pagination.last_page ? "#ccc" : "#2C3E50"} />
+            </TouchableOpacity>
+            
+            <TouchableOpacity 
+              style={[
+                styles.paginationButton,
+                pagination.current_page === pagination.last_page && styles.paginationButtonDisabled
+              ]}
+              onPress={goToLastPage}
+              disabled={pagination.current_page === pagination.last_page}
+            >
+              <Icon name="step-forward" size={14} color={pagination.current_page === pagination.last_page ? "#ccc" : "#2C3E50"} />
+            </TouchableOpacity>
+          </View>
         </View>
       )}
     </View>
@@ -405,7 +503,7 @@ const styles = StyleSheet.create({
     color: '#666',
     fontSize: 16,
   },
-  pagination: {
+  paginationContainer: {
     padding: 15,
     backgroundColor: '#fff',
     borderTopWidth: 1,
@@ -414,6 +512,29 @@ const styles = StyleSheet.create({
   paginationText: {
     textAlign: 'center',
     color: '#666',
+    fontSize: 14,
+    marginBottom: 10,
+  },
+  paginationControls: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  paginationButton: {
+    padding: 8,
+    marginHorizontal: 5,
+    borderRadius: 6,
+    backgroundColor: '#f8fafc',
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+  },
+  paginationButtonDisabled: {
+    opacity: 0.5,
+  },
+  pageIndicator: {
+    marginHorizontal: 15,
+    color: '#2C3E50',
+    fontWeight: '600',
     fontSize: 14,
   },
 });
