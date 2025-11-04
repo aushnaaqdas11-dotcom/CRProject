@@ -19,7 +19,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import LinearGradient from 'react-native-linear-gradient';
 import Icon from 'react-native-vector-icons/FontAwesome';
 import { Colors } from '../styles/theme';
-import { useAuth } from '../context/AuthContext';
+import { useAuth } from '../hooks/redux'; // Updated import - from '../hooks/redux'
 
 // WigglyChar component
 const WigglyChar = ({ char }) => {
@@ -77,13 +77,14 @@ const LoginScreen = ({ navigation }) => {
   const [showPassword, setShowPassword] = useState(false);
   const [captchaText, setCaptchaText] = useState('');
   const [userCaptcha, setUserCaptcha] = useState('');
-  const [isLoading, setIsLoading] = useState(false);
   const [rememberMe, setRememberMe] = useState(false);
   const [savedEmails, setSavedEmails] = useState([]);
   const [showEmailSuggestions, setShowEmailSuggestions] = useState(false);
 
   const shakeAnimation = useRef(new Animated.Value(0)).current;
-  const { login: authLogin } = useAuth();
+  
+  // Updated to use Redux instead of Context
+  const { login: authLogin, loading, getRedirectPath } = useAuth();
 
   // Initialize component
   useEffect(() => {
@@ -154,31 +155,21 @@ const LoginScreen = ({ navigation }) => {
       return;
     }
 
-    setIsLoading(true);
-
     try {
       const result = await authLogin(login, password);
       console.log("Login result:", result);
 
-      if (result.success) {
+      // Redux async thunk returns an action object with 'type' property
+      if (result.type === 'auth/login/fulfilled') {
         // Save email to suggestions when remember me is checked
         if (rememberMe) {
           await saveEmail(login);
         }
         
-        const role = parseInt(result.user?.role);
-        console.log("User role:", role);
+        const redirectTo = getRedirectPath();
+        console.log("Redirecting to:", redirectTo);
 
-        const dashboards = {
-          1: "AdminDashboard",
-          2: "UserDashboard",
-          3: "ResolverDashboard",
-          4: "AssignerDashboard"
-        };
-
-        const targetScreen = dashboards[role];
-
-        if (!targetScreen) {
+        if (!redirectTo) {
           Alert.alert("Navigation Error", "Dashboard not found for your role");
           generateCaptcha();
           return;
@@ -186,11 +177,13 @@ const LoginScreen = ({ navigation }) => {
 
         navigation.reset({
           index: 0,
-          routes: [{ name: targetScreen }],
+          routes: [{ name: redirectTo }],
         });
 
-      } else {
-        const firstError = Object.values(result.errors || {})[0]?.[0] || result.message;
+      } else if (result.type === 'auth/login/rejected') {
+        // Handle login failure
+        const errorData = result.payload;
+        const firstError = Object.values(errorData?.errors || {})[0]?.[0] || errorData?.message || 'Login failed';
         Alert.alert('Login Failed', firstError);
         generateCaptcha();
       }
@@ -199,8 +192,6 @@ const LoginScreen = ({ navigation }) => {
       console.error("Login exception:", err);
       Alert.alert('Login Failed', 'Something went wrong. Please try again.');
       generateCaptcha();
-    } finally {
-      setIsLoading(false);
     }
   };
 
@@ -335,12 +326,12 @@ const LoginScreen = ({ navigation }) => {
                 </View>
 
                 <TouchableOpacity
-                  style={[styles.loginButton, isLoading && styles.loginButtonDisabled]}
+                  style={[styles.loginButton, loading && styles.loginButtonDisabled]}
                   onPress={handleLogin}
-                  disabled={isLoading}
+                  disabled={loading}
                 >
                   <LinearGradient colors={[Colors.primary, Colors.secondary]} style={styles.loginButtonGradient}>
-                    {isLoading ? <ActivityIndicator color={Colors.accent} size="small" /> : <Text style={styles.loginButtonText}>Sign In</Text>}
+                    {loading ? <ActivityIndicator color={Colors.accent} size="small" /> : <Text style={styles.loginButtonText}>Sign In</Text>}
                   </LinearGradient>
                 </TouchableOpacity>
 
@@ -371,6 +362,7 @@ const LoginScreen = ({ navigation }) => {
   );
 };
 
+// Styles remain exactly the same...
 const styles = StyleSheet.create({
   container: { 
     flex: 1,

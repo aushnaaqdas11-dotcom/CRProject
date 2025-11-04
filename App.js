@@ -1,14 +1,18 @@
 import React from 'react';
 import { StatusBar } from 'react-native';
-import { AuthProvider } from './src/context/AuthContext';
+import { Provider } from 'react-redux';
+import { PersistGate } from 'redux-persist/integration/react';
+import { store, persistor } from './src/store'; // Import from our new store
 import AppNavigator from './src/navigation/AppNavigator';
 
 const App = () => {
   return (
-    <AuthProvider>
-      <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" translucent />
-      <AppNavigator />
-    </AuthProvider>
+    <Provider store={store}>
+      <PersistGate loading={null} persistor={persistor}>
+        <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" translucent />
+        <AppNavigator />
+      </PersistGate>
+    </Provider>
   );
 };
 

@@ -4,7 +4,7 @@ import {
   TextInput, ActivityIndicator, StatusBar, Alert,
   RefreshControl, Dimensions, Animated, PanResponder
 } from 'react-native';
-import { useAuth } from '../context/AuthContext';
+import { useAuth } from '../hooks/redux';
 import { useNavigation } from '@react-navigation/native';
 import { Dropdown } from 'react-native-element-dropdown';
 import LinearGradient from 'react-native-linear-gradient';

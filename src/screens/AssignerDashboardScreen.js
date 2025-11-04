@@ -14,7 +14,7 @@ import {
   RefreshControl,
   Alert
 } from 'react-native';
-import { useAuth } from '../context/AuthContext';
+import { useAuth } from '../hooks/redux';
 import { useNavigation } from '@react-navigation/native';
 import * as Animatable from 'react-native-animatable';
 import LinearGradient from 'react-native-linear-gradient';

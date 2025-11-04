@@ -12,6 +12,7 @@ import {
 } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
 import { Colors } from '../styles/theme';
+import { useAuth } from '../hooks/redux'; // Updated import
 
 const { width, height } = Dimensions.get('window');
 
@@ -26,6 +27,14 @@ const SplashScreen = ({ navigation }) => {
   const particleAnim2 = useRef(new Animated.Value(0)).current;
   const particleAnim3 = useRef(new Animated.Value(0)).current;
   const textGlowAnim = useRef(new Animated.Value(0)).current;
+
+  // Use Redux auth hook
+  const { user, token, loading, loadUser } = useAuth();
+
+  useEffect(() => {
+    // Load user data from storage
+    loadUser();
+  }, [loadUser]);
 
   useEffect(() => {
     // Enhanced animation sequence
@@ -92,14 +101,28 @@ const SplashScreen = ({ navigation }) => {
       ]),
     ]).start();
 
-    // Navigate to Welcome screen after delay
+    // Navigate based on auth state after delay
     const timer = setTimeout(() => {
-      navigation.replace('Welcome');
+      if (token && user) {
+        // User is logged in - navigate to appropriate dashboard
+        const dashboards = {
+          1: "AdminDashboard",
+          2: "UserDashboard", 
+          3: "ResolverDashboard",
+          4: "AssignerDashboard"
+        };
+        const targetScreen = dashboards[parseInt(user.role)] || 'UserDashboard';
+        navigation.replace(targetScreen);
+      } else {
+        // User is not logged in - navigate to Welcome
+        navigation.replace('Welcome');
+      }
     }, 3500);
 
     return () => clearTimeout(timer);
-  }, [navigation, fadeAnim, scaleAnim, slideAnim, rotateAnim, glowAnim, textGlowAnim, particleAnim1, particleAnim2, particleAnim3]);
+  }, [navigation, fadeAnim, scaleAnim, slideAnim, rotateAnim, glowAnim, textGlowAnim, particleAnim1, particleAnim2, particleAnim3, token, user]);
 
+  // ... (rest of the component remains exactly the same)
   const rotateInterpolate = rotateAnim.interpolate({
     inputRange: [0, 1],
     outputRange: ['0deg', '360deg'],
@@ -408,6 +431,7 @@ const SplashScreen = ({ navigation }) => {
   );
 };
 
+// ... (styles remain exactly the same)
 const styles = StyleSheet.create({
   container: {
     flex: 1,

@@ -14,7 +14,7 @@ import {
 } from 'react-native';
 import * as Animatable from 'react-native-animatable';
 import { useRoute, useNavigation } from '@react-navigation/native';
-import { useAuth } from '../context/AuthContext';
+import { useAuth } from '../hooks/redux';
 import { Picker } from '@react-native-picker/picker';
 import LinearGradient from 'react-native-linear-gradient';
 import Icon from 'react-native-vector-icons/FontAwesome';

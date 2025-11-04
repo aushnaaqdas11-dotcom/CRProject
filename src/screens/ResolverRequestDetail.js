@@ -16,7 +16,7 @@ import {
   StatusBar,
   DrawerLayoutAndroid
 } from 'react-native';
-import { useAuth } from '../context/AuthContext';
+import { useAuth } from '../hooks/redux';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import LinearGradient from 'react-native-linear-gradient';
 

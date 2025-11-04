@@ -14,7 +14,7 @@ import {
 } from 'react-native';
 import { adminAPI } from '../../services/apiService';
 import Icon from 'react-native-vector-icons/FontAwesome';
-import { useAuth } from '../../context/AuthContext';
+import { useAuth } from '../../hooks/redux';
 
 const { width } = Dimensions.get('window');
 
