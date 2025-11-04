@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -15,11 +15,11 @@ import {
   ActivityIndicator,
   ImageBackground
 } from 'react-native';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as Keychain from 'react-native-keychain';
 import LinearGradient from 'react-native-linear-gradient';
 import Icon from 'react-native-vector-icons/FontAwesome';
 import { Colors } from '../styles/theme';
-import { useAuth } from '../hooks/redux'; // Updated import - from '../hooks/redux'
+import { useAuth } from '../hooks/redux';
 
 // WigglyChar component
 const WigglyChar = ({ char }) => {
@@ -28,11 +28,23 @@ const WigglyChar = ({ char }) => {
   useEffect(() => {
     const animate = () => {
       Animated.sequence([
-        Animated.timing(rotation, { toValue: Math.random() * 40 - 20, duration: 2000, useNativeDriver: true }),
-        Animated.timing(rotation, { toValue: Math.random() * 40 - 20, duration: 2000, useNativeDriver: true }),
+        Animated.timing(rotation, { 
+          toValue: Math.random() * 40 - 20, 
+          duration: 2000, 
+          useNativeDriver: true 
+        }),
+        Animated.timing(rotation, { 
+          toValue: Math.random() * 40 - 20, 
+          duration: 2000, 
+          useNativeDriver: true 
+        }),
       ]).start(() => animate());
     };
     animate();
+    
+    return () => {
+      rotation.stopAnimation();
+    };
   }, [rotation]);
 
   return (
@@ -43,7 +55,10 @@ const WigglyChar = ({ char }) => {
         color: '#4ECDC4',
         marginHorizontal: 2,
         fontFamily: 'monospace',
-        transform: [{ rotate: rotation.interpolate({ inputRange: [-20, 20], outputRange: ['-20deg', '20deg'] }) }]
+        transform: [{ rotate: rotation.interpolate({ 
+          inputRange: [-20, 20], 
+          outputRange: ['-20deg', '20deg'] 
+        }) }]
       }}
     >
       {char}
@@ -51,7 +66,7 @@ const WigglyChar = ({ char }) => {
   );
 };
 
-// EmailSuggestions component - Fixed to not use FlatList
+// EmailSuggestions component
 const EmailSuggestions = ({ emails, onEmailSelect, visible }) => {
   if (!visible || emails.length === 0) return null;
 
@@ -72,50 +87,102 @@ const EmailSuggestions = ({ emails, onEmailSelect, visible }) => {
 };
 
 const LoginScreen = ({ navigation }) => {
+  // State declarations
   const [login, setLogin] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [captchaText, setCaptchaText] = useState('');
   const [userCaptcha, setUserCaptcha] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
   const [rememberMe, setRememberMe] = useState(false);
   const [savedEmails, setSavedEmails] = useState([]);
   const [showEmailSuggestions, setShowEmailSuggestions] = useState(false);
 
+  // Refs
   const shakeAnimation = useRef(new Animated.Value(0)).current;
+  const emailInputRef = useRef(null);
+  const passwordInputRef = useRef(null);
   
-  // Updated to use Redux instead of Context
-  const { login: authLogin, loading, getRedirectPath } = useAuth();
+  // Auth hook
+  const { login: authLogin, getRedirectPath } = useAuth();
 
-  // Initialize component
-  useEffect(() => {
-    loadSavedEmails();
-    generateCaptcha();
-  }, []);
-
-  const loadSavedEmails = async () => {
+  // Load saved credentials from Keychain
+  const loadSavedCredentials = useCallback(async () => {
     try {
-      const saved = await AsyncStorage.getItem('savedEmails');
-      if (saved) {
-        setSavedEmails(JSON.parse(saved));
+      // Load saved emails for suggestions
+      const savedEmailsData = await Keychain.getInternetCredentials('savedEmails');
+      if (savedEmailsData) {
+        setSavedEmails(JSON.parse(savedEmailsData.password));
+      }
+
+      // Load auto-login credentials if remember me was enabled
+      const credentials = await Keychain.getGenericPassword();
+      if (credentials) {
+        setLogin(credentials.username);
+        setPassword(credentials.password);
+        setRememberMe(true);
       }
     } catch (error) {
-      console.log('Error loading saved emails:', error);
+      console.log('Error loading saved credentials:', error);
     }
-  };
+  }, []);
 
-  const saveEmail = async (email) => {
+  // Save credentials to Keychain
+  const saveCredentials = useCallback(async (email, password) => {
+    try {
+      if (email && password) {
+        await Keychain.setGenericPassword(email, password, {
+          accessible: Keychain.ACCESSIBLE.WHEN_UNLOCKED_THIS_DEVICE_ONLY,
+        });
+
+        await Keychain.setInternetCredentials(
+          'crp-portal',
+          email,
+          password,
+          {
+            accessible: Keychain.ACCESSIBLE.WHEN_UNLOCKED_THIS_DEVICE_ONLY,
+          }
+        );
+        
+        await saveEmailToSuggestions(email);
+      }
+    } catch (error) {
+      console.log('Error saving credentials:', error);
+    }
+  }, []);
+
+  // Save email to suggestions
+  const saveEmailToSuggestions = useCallback(async (email) => {
     try {
       if (email && !savedEmails.includes(email)) {
         const updatedEmails = [...savedEmails, email];
         setSavedEmails(updatedEmails);
-        await AsyncStorage.setItem('savedEmails', JSON.stringify(updatedEmails));
+        
+        await Keychain.setInternetCredentials(
+          'savedEmails',
+          'savedEmails',
+          JSON.stringify(updatedEmails)
+        );
       }
     } catch (error) {
-      console.log('Error saving email:', error);
+      console.log('Error saving email to suggestions:', error);
     }
-  };
+  }, [savedEmails]);
 
-  const generateCaptcha = () => {
+  // Clear saved credentials
+  const clearSavedCredentials = useCallback(async () => {
+    try {
+      await Keychain.resetGenericPassword();
+      if (login) {
+        await Keychain.resetInternetCredentials('crp-portal');
+      }
+    } catch (error) {
+      console.log('Error clearing credentials:', error);
+    }
+  }, [login]);
+
+  // Generate CAPTCHA
+  const generateCaptcha = useCallback(() => {
     const characters = 'ABCDEFGHJKLMNPQRSTUVWXYZ0123456789';
     let result = '';
     const length = Math.random() > 0.5 ? 6 : 7;
@@ -125,23 +192,48 @@ const LoginScreen = ({ navigation }) => {
     }
     setCaptchaText(result);
     setUserCaptcha('');
-  };
+  }, []);
 
-  const shake = () => {
+  // Shake animation
+  const shake = useCallback(() => {
     Animated.sequence([
       Animated.timing(shakeAnimation, { toValue: 10, duration: 100, useNativeDriver: true }),
       Animated.timing(shakeAnimation, { toValue: -10, duration: 100, useNativeDriver: true }),
       Animated.timing(shakeAnimation, { toValue: 10, duration: 100, useNativeDriver: true }),
       Animated.timing(shakeAnimation, { toValue: 0, duration: 100, useNativeDriver: true })
     ]).start();
-  };
+  }, [shakeAnimation]);
 
-  const handleEmailSelect = (email) => {
+  // ✅ FIXED: Handle email selection from suggestions
+  const handleEmailSelect = useCallback((email) => {
     setLogin(email);
     setShowEmailSuggestions(false);
-  };
+    // Only focus on password when user explicitly selects an email
+    setTimeout(() => {
+      passwordInputRef.current?.focus();
+    }, 100);
+  }, []);
 
-  const handleLogin = async () => {
+  // ✅ FIXED: Handle email typing - NO AUTO-FOCUS!
+  const handleEmailChange = useCallback((text) => {
+    setLogin(text);
+    // ❌ NO auto-focus to password field!
+    // ✅ User can type email normally
+  }, []);
+
+  // Handle remember me toggle
+  const handleRememberMeToggle = useCallback(async () => {
+    const newRememberMe = !rememberMe;
+    setRememberMe(newRememberMe);
+    
+    if (!newRememberMe) {
+      await clearSavedCredentials();
+      setPassword('');
+    }
+  }, [rememberMe, clearSavedCredentials]);
+
+  // Handle login
+  const handleLogin = useCallback(async () => {
     if (!login || !password) {
       Alert.alert('Error', 'Please enter both login and password');
       shake();
@@ -155,15 +247,17 @@ const LoginScreen = ({ navigation }) => {
       return;
     }
 
+    setIsLoading(true);
+
     try {
       const result = await authLogin(login, password);
       console.log("Login result:", result);
 
-      // Redux async thunk returns an action object with 'type' property
-      if (result.type === 'auth/login/fulfilled') {
-        // Save email to suggestions when remember me is checked
+      if (result.type === 'auth/login/fulfilled' || result.success) {
         if (rememberMe) {
-          await saveEmail(login);
+          await saveCredentials(login, password);
+        } else {
+          await clearSavedCredentials();
         }
         
         const redirectTo = getRedirectPath();
@@ -180,9 +274,8 @@ const LoginScreen = ({ navigation }) => {
           routes: [{ name: redirectTo }],
         });
 
-      } else if (result.type === 'auth/login/rejected') {
-        // Handle login failure
-        const errorData = result.payload;
+      } else {
+        const errorData = result.payload || result;
         const firstError = Object.values(errorData?.errors || {})[0]?.[0] || errorData?.message || 'Login failed';
         Alert.alert('Login Failed', firstError);
         generateCaptcha();
@@ -192,8 +285,20 @@ const LoginScreen = ({ navigation }) => {
       console.error("Login exception:", err);
       Alert.alert('Login Failed', 'Something went wrong. Please try again.');
       generateCaptcha();
+    } finally {
+      setIsLoading(false);
     }
-  };
+  }, [
+    login, password, userCaptcha, captchaText, rememberMe, 
+    authLogin, getRedirectPath, navigation, shake, generateCaptcha, 
+    saveCredentials, clearSavedCredentials
+  ]);
+
+  // Initialize component
+  useEffect(() => {
+    loadSavedCredentials();
+    generateCaptcha();
+  }, [loadSavedCredentials, generateCaptcha]);
 
   const filteredEmails = savedEmails.filter(email => 
     email.toLowerCase().includes(login.toLowerCase())
@@ -206,7 +311,6 @@ const LoginScreen = ({ navigation }) => {
     >
       <StatusBar barStyle="light-content" backgroundColor={Colors.primary} />
 
-      {/* Background Image Container */}
       <ImageBackground 
         source={require('../assets/images/LoginArfa.jpg')} 
         style={styles.backgroundImage}
@@ -221,7 +325,6 @@ const LoginScreen = ({ navigation }) => {
             keyboardShouldPersistTaps="handled"
             showsVerticalScrollIndicator={false}
           >
-            {/* Logo Section */}
             <View style={styles.logoSection}>
               <View style={styles.logoContainer}>
                 <Image 
@@ -239,7 +342,6 @@ const LoginScreen = ({ navigation }) => {
               <Text style={styles.welcomeSubtitle}>Government of the Punjab</Text>
             </View>
 
-            {/* Login Card - Now with transparent background to show image behind */}
             <Animated.View style={[styles.cardContainer, { transform: [{ translateX: shakeAnimation }] }]}>
               <View style={styles.card}>
                 <View style={styles.header}>
@@ -247,19 +349,26 @@ const LoginScreen = ({ navigation }) => {
                   <Text style={styles.subtitle}>Access Your Change Request Portal</Text>
                 </View>
 
-                {/* Email Input with Suggestions */}
                 <View style={styles.inputContainer}>
                   <View style={styles.inputWrapper}>
                     <Icon name="user" size={20} color={Colors.secondary} style={styles.inputIcon} />
                     <TextInput
+                      ref={emailInputRef}
                       style={styles.input}
                       placeholder="Email or CNIC"
                       placeholderTextColor="#666"
                       value={login}
-                      onChangeText={setLogin}
+                      onChangeText={handleEmailChange} // ✅ FIXED: No auto-focus
                       onFocus={() => setShowEmailSuggestions(true)}
                       onBlur={() => setTimeout(() => setShowEmailSuggestions(false), 200)}
                       autoCapitalize="none"
+                      autoComplete="email"
+                      textContentType="emailAddress"
+                      importantForAutofill="yes"
+                      autoCorrect={false}
+                      keyboardType="email-address"
+                      returnKeyType="next"
+                      onSubmitEditing={() => passwordInputRef.current?.focus()} // ✅ Only when user presses "next"
                     />
                   </View>
 
@@ -273,30 +382,35 @@ const LoginScreen = ({ navigation }) => {
                 <View style={styles.inputWrapper}>
                   <Icon name="lock" size={20} color={Colors.secondary} style={styles.inputIcon} />
                   <TextInput
+                    ref={passwordInputRef}
                     style={styles.input}
                     placeholder="Password"
                     placeholderTextColor="#666"
                     value={password}
                     onChangeText={setPassword}
                     secureTextEntry={!showPassword}
+                    autoComplete="password"
+                    textContentType="password"
+                    importantForAutofill="yes"
+                    autoCorrect={false}
+                    returnKeyType="done"
+                    onSubmitEditing={handleLogin}
                   />
                   <TouchableOpacity onPress={() => setShowPassword(!showPassword)}>
                     <Icon name={showPassword ? 'eye-slash' : 'eye'} size={20} color="#666" />
                   </TouchableOpacity>
                 </View>
 
-                {/* Remember Me */}
                 <View style={styles.rememberMeContainer}>
                   <TouchableOpacity 
                     style={[styles.checkbox, rememberMe && styles.checkboxChecked]}
-                    onPress={() => setRememberMe(!rememberMe)}
+                    onPress={handleRememberMeToggle}
                   >
                     {rememberMe && <Icon name="check" size={12} color="#fff" />}
                   </TouchableOpacity>
                   <Text style={styles.rememberMeText}>Remember me</Text>
                 </View>
 
-                {/* CAPTCHA */}
                 <View style={styles.captchaContainer}>
                   <View style={styles.captchaHeader}>
                     <Text style={styles.captchaTitle}>SECURITY VERIFICATION</Text>
@@ -317,6 +431,9 @@ const LoginScreen = ({ navigation }) => {
                       value={userCaptcha}
                       onChangeText={setUserCaptcha}
                       autoCapitalize="characters"
+                      autoComplete="off"
+                      textContentType="none"
+                      importantForAutofill="no"
                     />
                     <TouchableOpacity onPress={generateCaptcha} style={styles.refreshButton}>
                       <Icon name="refresh" size={16} color={Colors.primary} />
@@ -326,16 +443,15 @@ const LoginScreen = ({ navigation }) => {
                 </View>
 
                 <TouchableOpacity
-                  style={[styles.loginButton, loading && styles.loginButtonDisabled]}
+                  style={[styles.loginButton, isLoading && styles.loginButtonDisabled]}
                   onPress={handleLogin}
-                  disabled={loading}
+                  disabled={isLoading}
                 >
                   <LinearGradient colors={[Colors.primary, Colors.secondary]} style={styles.loginButtonGradient}>
-                    {loading ? <ActivityIndicator color={Colors.accent} size="small" /> : <Text style={styles.loginButtonText}>Sign In</Text>}
+                    {isLoading ? <ActivityIndicator color={Colors.accent} size="small" /> : <Text style={styles.loginButtonText}>Sign In</Text>}
                   </LinearGradient>
                 </TouchableOpacity>
 
-                {/* Forgot Password */}
                 <TouchableOpacity style={styles.forgotPasswordContainer}>
                   <Text style={styles.forgotPasswordText}>Forgot Password?</Text>
                 </TouchableOpacity>
@@ -343,7 +459,6 @@ const LoginScreen = ({ navigation }) => {
             </Animated.View>
           </ScrollView>
 
-          {/* Footer */}
           <View style={styles.footer}>
             <View style={styles.footerContent}>
               <View style={styles.footerLogoContainer}>
@@ -362,7 +477,6 @@ const LoginScreen = ({ navigation }) => {
   );
 };
 
-// Styles remain exactly the same...
 const styles = StyleSheet.create({
   container: { 
     flex: 1,
@@ -555,7 +669,7 @@ const styles = StyleSheet.create({
   captchaTitle: {
     fontSize: 14,
     fontWeight: 'bold',
-    color: '#4ECDC4  ',
+    color: '#4ECDC4',
     textAlign: 'center',
   },
   captchaDisplay: {
@@ -563,7 +677,7 @@ const styles = StyleSheet.create({
     padding: 20,
     borderRadius: 8,
     borderWidth: 2,
-    borderColor: '#4ECDC4  ',
+    borderColor: '#4ECDC4',
     borderStyle: 'dashed',
     marginBottom: 10,
     alignItems: 'center',

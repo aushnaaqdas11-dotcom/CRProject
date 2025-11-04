@@ -197,50 +197,7 @@ const WelcomeScreen = ({ navigation, route }) => {
     <SafeAreaView style={styles.container}>
       <StatusBar barStyle="light-content" translucent backgroundColor="transparent" />
       
-      {/* Fixed Navbar - Same as Login Screen */}
-      <View style={styles.navbar}>
-        <View style={styles.navbarContent}>
-          {/* Logo Section - Same as Login Screen */}
-          <TouchableOpacity style={styles.logoContainer}>
-            <LinearGradient colors={[Colors.primary, Colors.secondary]} style={styles.logoGradient}>
-              <View style={styles.logosWrapper}>
-                <Image 
-                  source={require('../assets/images/PITBLOGO.png')} 
-                  style={styles.navpitbLogo} 
-                  resizeMode="contain" 
-                />
-                <Image 
-                  source={require('../assets/images/crp.png')} 
-                  style={styles.navcrpLogo} 
-                  resizeMode="contain" 
-                />
-              </View>
-            </LinearGradient>
-          </TouchableOpacity>
-
-          {/* Navigation Links */}
-          <View style={styles.navLinks}>
-            <TouchableOpacity onPress={handleServicesPress} style={styles.navButton}>
-              <Text style={styles.navButtonText}>Services</Text>
-            </TouchableOpacity>
-            
-            <TouchableOpacity onPress={handleProjectsPress} style={styles.navButton}>
-              <Text style={styles.navButtonText}>Projects</Text>
-            </TouchableOpacity>
-            
-            <TouchableOpacity onPress={handleSignInPress}>
-              <LinearGradient
-                colors={[Colors.primary, Colors.secondary]}
-                style={styles.signInButton}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 1 }}
-              >
-                <Text style={styles.signInButtonText}>Sign In</Text>
-              </LinearGradient>
-            </TouchableOpacity>
-          </View>
-        </View>
-      </View>
+    
 
       <ScrollView 
         ref={scrollViewRef}
@@ -440,8 +397,8 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1, 
     borderBottomColor: '#e0e0e0', 
     paddingHorizontal: 16,
-    paddingTop: 40,
-    paddingBottom: 7,
+    paddingTop: 42,
+    paddingBottom: 10,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
@@ -461,12 +418,12 @@ const styles = StyleSheet.create({
     paddingHorizontal: 15,
     paddingVertical: 5,
   },
-  navpitbLogo: {
+  pitbLogo: {
     width: 35,
     height: 35,
     marginRight: 10,
   },
-  navcrpLogo: {
+  crpLogo: {
     width: 45,
     height: 35,
   },
@@ -517,7 +474,7 @@ const styles = StyleSheet.create({
     flexGrow: 1,
   },
   heroSection: { 
-    minHeight: height * 0.9, 
+    minHeight: height * 1, 
     justifyContent: 'center', 
     alignItems: 'center', 
     position: 'relative',

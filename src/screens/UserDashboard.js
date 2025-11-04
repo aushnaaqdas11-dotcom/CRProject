@@ -402,17 +402,7 @@ const UserDashboard = () => {
                 </Text>
                 <Text style={styles.roleText}>User Dashboard</Text>
               </View>
-              <View style={styles.headerButtons}>
-                <TouchableOpacity 
-                  style={styles.viewHistoryBtn} 
-                  onPress={() => navigation.navigate('UserHistory')}
-                >
-                  <LinearGradient colors={['rgba(255,255,255,0.2)', 'rgba(255,255,255,0.3)']} style={styles.viewHistoryBtnGradient}>
-                    <Icon name="history" size={16} color="#fff" style={styles.viewHistoryIcon} />
-                    <Text style={styles.viewHistoryText}>View History</Text>
-                  </LinearGradient>
-                </TouchableOpacity>
-              </View>
+             
             </View>
           </LinearGradient>
 
