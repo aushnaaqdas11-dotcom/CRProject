@@ -547,14 +547,7 @@ const RequestDetailScreen = () => {
             </LinearGradient>
           </TouchableOpacity>
 
-          <TouchableOpacity
-            style={styles.backButton}
-            onPress={() => navigation.canGoBack() && navigation.goBack()}
-          >
-            <LinearGradient colors={['#6B7280', '#9CA3AF']} style={styles.buttonGradient}>
-              <Text style={styles.buttonText}>Go Back</Text>
-            </LinearGradient>
-          </TouchableOpacity>
+         
         </ScrollView>
       </View>
     </DrawerLayoutAndroid>
