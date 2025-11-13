@@ -101,26 +101,13 @@ const ManageUsers = ({ navigation }) => {
   };
 
   // Function to get role name with multiple fallbacks
-  const getRoleName = (user) => {
-    if (user.role_data && user.role_data.name) {
-      return user.role_data.name;
-    }
-    if (user.role_name) {
-      return user.role_name;
-    }
-    if (user.role) {
-      // Map role IDs to names
-      const roleMap = {
-        1: 'Admin',
-        2: 'User',
-        3: 'Developer',
-        4: 'Resolver',
-        5: 'Assigner'
-      };
-      return roleMap[user.role] || `Role ${user.role}`;
-    }
-    return 'Unknown';
-  };
+  // In ManageUsers.js - Replace the getRoleName function
+const getRoleName = (user) => {
+  if (user.role && user.role.name) {
+    return user.role.name;
+  }
+  return 'No Role Assigned';
+};
 
   // Pagination handlers
   const goToFirstPage = () => {
@@ -146,53 +133,52 @@ const ManageUsers = ({ navigation }) => {
       loadUsers(pagination.last_page, searchQuery);
     }
   };
-
-  const renderUserItem = ({ item, index }) => (
-    <View style={styles.userCard}>
-      <View style={styles.userHeader}>
-        <Text style={styles.userSerial}>{(pagination.current_page - 1) * 10 + index + 1}</Text>
-        <Text style={styles.userName}>{item.name}</Text>
+const renderUserItem = ({ item, index }) => (
+  <View style={styles.userCard}>
+    <View style={styles.userHeader}>
+      <Text style={styles.userSerial}>{(pagination.current_page - 1) * 10 + index + 1}</Text>
+      <Text style={styles.userName}>{item.name}</Text>
+    </View>
+    
+    <View style={styles.userDetails}>
+      <View style={styles.detailRow}>
+        <Text style={styles.detailLabel}>CNIC:</Text>
+        <Text style={styles.detailValue}>{item.cnic}</Text>
       </View>
-      
-      <View style={styles.userDetails}>
-        <View style={styles.detailRow}>
-          <Text style={styles.detailLabel}>CNIC:</Text>
-          <Text style={styles.detailValue}>{item.cnic}</Text>
-        </View>
-        <View style={styles.detailRow}>
-          <Text style={styles.detailLabel}>Phone:</Text>
-          <Text style={styles.detailValue}>{item.phone}</Text>
-        </View>
-        <View style={styles.detailRow}>
-          <Text style={styles.detailLabel}>Email:</Text>
-          <Text style={styles.detailValue}>{item.email}</Text>
-        </View>
-        <View style={styles.detailRow}>
-          <Text style={styles.detailLabel}>Role:</Text>
-          <Text style={[styles.detailValue, styles.roleText]}>
-            {getRoleName(item)}
-          </Text>
-        </View>
+      <View style={styles.detailRow}>
+        <Text style={styles.detailLabel}>Phone:</Text>
+        <Text style={styles.detailValue}>{item.phone}</Text>
       </View>
-
-      <View style={styles.actions}>
-        <TouchableOpacity 
-          style={styles.editBtn}
-          onPress={() => navigation.navigate('EditUser', { userId: item.id })}
-        >
-          <Icon name="edit" size={16} color="#fff" />
-          <Text style={styles.actionText}>Edit</Text>
-        </TouchableOpacity>
-        <TouchableOpacity 
-          style={styles.deleteBtn}
-          onPress={() => handleDeleteUser(item.id, item.name)}
-        >
-          <Icon name="trash" size={16} color="#fff" />
-          <Text style={styles.actionText}>Delete</Text>
-        </TouchableOpacity>
+      <View style={styles.detailRow}>
+        <Text style={styles.detailLabel}>Email:</Text>
+        <Text style={styles.detailValue}>{item.email}</Text>
+      </View>
+      <View style={styles.detailRow}>
+        <Text style={styles.detailLabel}>Role:</Text>
+        <Text style={[styles.detailValue, styles.roleText]}>
+          {item.role ? item.role.name : 'No Role Assigned'}
+        </Text>
       </View>
     </View>
-  );
+
+    <View style={styles.actions}>
+      <TouchableOpacity 
+        style={styles.editBtn}
+        onPress={() => navigation.navigate('EditUser', { userId: item.id })}
+      >
+        <Icon name="edit" size={16} color="#fff" />
+        <Text style={styles.actionText}>Edit</Text>
+      </TouchableOpacity>
+      <TouchableOpacity 
+        style={styles.deleteBtn}
+        onPress={() => handleDeleteUser(item.id, item.name)}
+      >
+        <Icon name="trash" size={16} color="#fff" />
+        <Text style={styles.actionText}>Delete</Text>
+      </TouchableOpacity>
+    </View>
+  </View>
+);
 
   if (loading && users.length === 0) {
     return (

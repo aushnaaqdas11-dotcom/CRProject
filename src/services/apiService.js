@@ -1,7 +1,7 @@
 // services/apiService.js
 import axios from 'axios';
 
-const BASE_URL = 'http://10.50.206.117:8000/api';
+const BASE_URL = 'http://10.50.206.142:8000/api';
 
 const apiService = axios.create({
   baseURL: BASE_URL,
@@ -133,12 +133,24 @@ export const adminAPI = {
     return apiService.delete(`/admin/users/${userId}/projects/${projectId}`);
   }
 };
+export const adgAPI = {
+  setAuthToken(token) {
+    authToken = token;
+    if (token) {
+      apiService.defaults.headers.common['Authorization'] = `Bearer ${token}`;
+    } else {
+      delete apiService.defaults.headers.common['Authorization'];
+    }
+  },
 
+  getDashboard: () => apiService.get('/adg/dashboard'),
+};
 // Existing user APIs remain the same
 export default {
   setAuthToken(token) {
     adminAPI.setAuthToken(token);
     resolverAPI.setAuthToken(token);
+    adgAPI.setAuthToken(token); // Add this line
   },
 
   async login(login, password) {
@@ -188,10 +200,13 @@ export default {
   async getDevelopers() {
     return apiService.get('/developers');
   },
+  
 
   // Resolver methods - NEW ADDITION
   resolver: resolverAPI,
   
   // Admin methods - keep existing
   admin: adminAPI,
+  
+  adg: adgAPI, // Add this line
 };

@@ -1,25 +1,22 @@
 import React, { useEffect } from 'react';
 import { NavigationContainer } from '@react-navigation/native';
 import { createStackNavigator } from '@react-navigation/stack';
-import { useAuth } from '../hooks/redux'; // Updated import
+import { useAuth } from '../hooks/redux';
 import SplashScreen from '../screens/SplashScreen';
-import WelcomeScreen from '../screens/WelcomeScreen';
 import LoginScreen from '../screens/LoginScreen';
 import UserDashboard from '../screens/UserDashboard';
-import AdminDashboard from '../screens/AdminDashboard';
 import ResolverDashboard from '../screens/ResolverDashboard';
 import ResolverRequestDetail from '../screens/ResolverRequestDetail';
 import AssignerDashboardScreen from '../screens/AssignerDashboardScreen';
 import RequestDetailScreen from '../screens/RequestDetailScreen';
 import UserHistoryScreen from '../screens/UserHistoryScreen';
- 
-// Admin Screens
-import ManageUsers from '../screens/admin/ManageUsers';
-import RolesManagement from '../screens/admin/RolesManagement';
-import AssignProjects from '../screens/admin/AssignProjects';
-import CreateUser from '../screens/admin/CreateUser';
-import EditUser from '../screens/admin/EditUser';
-import EditRole from '../screens/admin/EditRole';
+
+
+// Import the Drawer Navigator
+import DrawerNavigator from './DrawerNavigator';
+
+import AdgDashboardScreen from '../screens/AdgDashboardScreen';
+
 
 const Stack = createStackNavigator();
 
@@ -37,29 +34,21 @@ const AppNavigator = () => {
 
   return (
     <NavigationContainer>
-      <Stack.Navigator
-        screenOptions={{ headerShown: false }}
-      >
+      <Stack.Navigator screenOptions={{ headerShown: false }}>
         {!token || !user ? (
           // No token or user - Auth screens
           <>
-            <Stack.Screen name="Welcome" component={WelcomeScreen} />
             <Stack.Screen name="Login" component={LoginScreen} />
           </>
         ) : (
           // User is authenticated - Show appropriate dashboard based on role
           (() => {
             switch (parseInt(user.role)) {
-              case 1: // Admin
+              case 1: // Admin - Use Drawer Navigator
                 return (
                   <>
-                    <Stack.Screen name="AdminDashboard" component={AdminDashboard} />
-                    <Stack.Screen name="ManageUsers" component={ManageUsers} />
-                    <Stack.Screen name="RolesManagement" component={RolesManagement} />
-                    <Stack.Screen name="AssignProjects" component={AssignProjects} />
-                    <Stack.Screen name="CreateUser" component={CreateUser} />
-                    <Stack.Screen name="EditUser" component={EditUser} />
-                    <Stack.Screen name="EditRole" component={EditRole} />
+                    <Stack.Screen name="MainApp" component={DrawerNavigator} />
+                    {/* Keep these as separate stack screens if they need to be outside drawer */}
                     <Stack.Screen name="UserHistory" component={UserHistoryScreen} />
                     <Stack.Screen name="RequestDetail" component={RequestDetailScreen} />
                   </>
@@ -86,6 +75,13 @@ const AppNavigator = () => {
                     <Stack.Screen name="RequestDetail" component={RequestDetailScreen} />
                   </>
                 );
+                  case 5: // ADG - Add this new case
+                return (
+                  <>
+<Stack.Screen name="ADG Dashboard" component={AdgDashboardScreen} />
+                    {/* Add other screens ADG might need access to */}
+                  </>
+                );
               default:
                 return (
                   <>
@@ -97,7 +93,6 @@ const AppNavigator = () => {
             }
           })()
         )}
-        
         {/* Common screens accessible from anywhere */}
         <Stack.Screen name="Splash" component={SplashScreen} />
       </Stack.Navigator>

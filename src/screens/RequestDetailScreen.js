@@ -10,16 +10,167 @@ import {
   Alert,
   Dimensions,
   StatusBar,
-  DrawerLayoutAndroid
+  DrawerLayoutAndroid,
+  Modal
 } from 'react-native';
-import * as Animatable from 'react-native-animatable';
 import { useRoute, useNavigation } from '@react-navigation/native';
 import { useAuth } from '../hooks/redux';
-import { Picker } from '@react-native-picker/picker';
 import LinearGradient from 'react-native-linear-gradient';
 import Icon from 'react-native-vector-icons/FontAwesome';
 
 const { width } = Dimensions.get('window');
+
+// Separate DeveloperDropdown component to fix hook order issue
+const DeveloperDropdown = ({ 
+  developers, 
+  assignedTo, 
+  onSelectDeveloper, 
+  onClearSelection 
+}) => {
+  const [showDeveloperModal, setShowDeveloperModal] = useState(false);
+
+  return (
+    <View style={styles.dropdownContainer}>
+      <Text style={styles.dropdownLabel}>Assign To Developer:</Text>
+      
+      {/* Custom Dropdown Trigger */}
+      <TouchableOpacity 
+        style={[
+          styles.dropdownTrigger,
+          !assignedTo && styles.dropdownTriggerEmpty
+        ]}
+        onPress={() => setShowDeveloperModal(true)}
+      >
+        <Text style={[
+          styles.dropdownTriggerText,
+          !assignedTo && styles.dropdownTriggerPlaceholder
+        ]}>
+          {assignedTo 
+            ? developers.find(d => d.id === assignedTo)?.name || 'Selected Developer'
+            : 'Select a developer'
+          }
+        </Text>
+        <Icon 
+          name={showDeveloperModal ? "chevron-up" : "chevron-down"} 
+          size={16} 
+          color="#2C3E50" 
+        />
+      </TouchableOpacity>
+
+      {/* Custom Modal for Developer Selection */}
+      <Modal
+        visible={showDeveloperModal}
+        transparent={true}
+        animationType="slide"
+        onRequestClose={() => setShowDeveloperModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            {/* Modal Header */}
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Select Developer</Text>
+              <TouchableOpacity 
+                onPress={() => setShowDeveloperModal(false)}
+                style={styles.modalCloseButton}
+              >
+                <Icon name="times" size={20} color="#2C3E50" />
+              </TouchableOpacity>
+            </View>
+
+            {/* Developers List */}
+            <ScrollView style={styles.developersList}>
+              {developers.length === 0 ? (
+                <View style={styles.emptyState}>
+                  <Icon name="users" size={40} color="#D1D5DB" />
+                  <Text style={styles.emptyStateText}>No developers available</Text>
+                  <Text style={styles.emptyStateSubtext}>
+                    Please check back later or contact support
+                  </Text>
+                </View>
+              ) : (
+                developers.map((developer, index) => (
+                  <TouchableOpacity
+                    key={developer.id}
+                    style={[
+                      styles.developerItem,
+                      assignedTo === developer.id && styles.developerItemSelected,
+                      index === developers.length - 1 && styles.lastDeveloperItem
+                    ]}
+                    onPress={() => {
+                      onSelectDeveloper(developer.id);
+                      setShowDeveloperModal(false);
+                    }}
+                  >
+                    <View style={styles.developerInfo}>
+                      <View style={[
+                        styles.developerAvatar,
+                        assignedTo === developer.id && styles.developerAvatarSelected
+                      ]}>
+                        <Text style={[
+                          styles.developerAvatarText,
+                          assignedTo === developer.id && styles.developerAvatarTextSelected
+                        ]}>
+                          {developer.name.charAt(0).toUpperCase()}
+                        </Text>
+                      </View>
+                      <View style={styles.developerDetails}>
+                        <Text style={[
+                          styles.developerName,
+                          assignedTo === developer.id && styles.developerNameSelected
+                        ]}>
+                          {developer.name}
+                        </Text>
+                        <Text style={styles.developerId}>
+                          ID: {developer.id}
+                        </Text>
+                      </View>
+                    </View>
+                    {assignedTo === developer.id && (
+                      <Icon name="check" size={16} color="#4ECDC4" />
+                    )}
+                  </TouchableOpacity>
+                ))
+              )}
+            </ScrollView>
+
+            {/* Modal Footer */}
+            
+            <View style={styles.modalFooter}>
+              <TouchableOpacity 
+                style={styles.cancelButton}
+                onPress={() => setShowDeveloperModal(false)}
+              >
+                <Text style={styles.cancelButtonText}>Cancel</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Selected Developer Preview */}
+      {assignedTo && (
+        <View style={styles.selectedDeveloperPreview}>
+          <View style={styles.selectedDeveloperBadge}>
+            <View style={styles.selectedDeveloperAvatar}>
+              <Text style={styles.selectedDeveloperAvatarText}>
+                {developers.find(d => d.id === assignedTo)?.name?.charAt(0).toUpperCase()}
+              </Text>
+            </View>
+            <Text style={styles.selectedDeveloperName}>
+              {developers.find(d => d.id === assignedTo)?.name}
+            </Text>
+            <TouchableOpacity 
+              onPress={onClearSelection}
+              style={styles.clearSelectionButton}
+            >
+              <Icon name="times" size={12} color="#6B7280" />
+            </TouchableOpacity>
+          </View>
+        </View>
+      )}
+    </View>
+  );
+};
 
 const RequestDetailScreen = () => {
   const route = useRoute();
@@ -36,6 +187,7 @@ const RequestDetailScreen = () => {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState(null);
 
+  // All hooks are now at the top level - no conditional hooks
   const openDrawer = () => {
     drawerRef.current?.openDrawer();
   };
@@ -109,15 +261,6 @@ const RequestDetailScreen = () => {
         <View style={styles.drawerDivider} />
 
         <TouchableOpacity 
-          style={styles.drawerItem}
-          onPress={() => {
-            closeDrawer();
-            // Add settings navigation here
-          }}
-        >
-        </TouchableOpacity>
-
-        <TouchableOpacity 
           style={[styles.drawerItem, styles.logoutDrawerItem]}
           onPress={() => {
             closeDrawer();
@@ -136,12 +279,6 @@ const RequestDetailScreen = () => {
       setError(null);
       const res = await userApi.getProjectRequests({ signal });
       
-      console.log('Request details response:', {
-        success: res.data?.success,
-        requestCount: res.data?.requests?.length,
-        status: res.status,
-      });
-      
       if (res.data?.success && Array.isArray(res.data.requests)) {
         const selected = res.data.requests.find(r => r.id === requestId);
         if (selected) {
@@ -152,18 +289,15 @@ const RequestDetailScreen = () => {
         } else {
           setRequest(null);
           setError('Request not found.');
-          console.log('Request not found with ID:', requestId);
           return false;
         }
       } else {
         const errorMsg = res.data?.message || 'Failed to load request details.';
         setError(errorMsg);
-        console.log('API Error:', errorMsg);
         return false;
       }
     } catch (error) {
       if (error.name !== 'AbortError') {
-        console.log('Details fetch error:', error.message);
         const errorMsg = error.response?.data?.message || error.message || 'Failed to load request details.';
         
         if (error.response?.status === 401) {
@@ -182,14 +316,7 @@ const RequestDetailScreen = () => {
 
   const fetchDevelopers = async (signal) => {
     try {
-      console.log('Starting fetchDevelopers');
       const res = await userApi.getDevelopers({ signal });
-      
-      console.log('Developers response:', {
-        success: res.data?.success,
-        developerCount: res.data?.developers?.length,
-        status: res.status,
-      });
       
       if (res.data?.success && Array.isArray(res.data.developers)) {
         const mappedDevelopers = res.data.developers
@@ -200,11 +327,9 @@ const RequestDetailScreen = () => {
           })
           .filter(dev => dev !== null);
           
-        console.log('Mapped developers:', mappedDevelopers);
         setDevelopers(mappedDevelopers);
       } else {
         setDevelopers([]);
-        console.log('Invalid or empty developers data');
       }
     } catch (err) {
       if (err.name !== 'AbortError') {
@@ -228,7 +353,6 @@ const RequestDetailScreen = () => {
           await fetchDevelopers(abortController.signal);
         }
       } catch (error) {
-        console.log('Load data error:', error);
         if (isMounted) {
           setError('Failed to load data. Please try again.');
         }
@@ -261,12 +385,10 @@ const RequestDetailScreen = () => {
         request_id: requestId,
         developer_id: assignedTo,
         assigner_comment: assignerComment,
+        status: 'inprogress'
       };
       
-      console.log('Assigning request with data:', data);
-      
       const res = await userApi.assignToDeveloper(data);
-      console.log('Assign response:', { success: res.data?.success, status: res.status });
       
       if (res.data?.success) {
         Alert.alert('Success', res.data.message || 'Request assigned successfully!', [
@@ -287,7 +409,6 @@ const RequestDetailScreen = () => {
         Alert.alert('Assignment Failed', errorMsg);
       }
     } catch (err) {
-      console.log('Assign request error:', err.message);
       const errorMsg = err.response?.data?.message || err.message || 'Failed to assign request. Please try again.';
       
       if (err.response?.status === 401) {
@@ -318,6 +439,14 @@ const RequestDetailScreen = () => {
       };
       loadData();
     }
+  };
+
+  const handleSelectDeveloper = (developerId) => {
+    setAssignedTo(developerId);
+  };
+
+  const handleClearSelection = () => {
+    setAssignedTo('');
   };
 
   if (loading) {
@@ -451,8 +580,6 @@ const RequestDetailScreen = () => {
         </View>
 
         <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
-         
-
           {/* Request Details Card */}
           <View style={styles.detailCard}>
             <Text style={styles.cardTitle}>Request Information</Text>
@@ -492,34 +619,17 @@ const RequestDetailScreen = () => {
             </View>
           </View>
 
-          {/* Assignment Section */}
+          {/* Assignment Section with Enhanced Dropdown */}
           <View style={styles.detailCard}>
             <Text style={styles.cardTitle}>Assignment</Text>
 
-            <View style={styles.detailSection}>
-              <Text style={styles.label}>Assign To Developer:</Text>
-              <View style={styles.pickerContainer}>
-                <Picker
-                  selectedValue={assignedTo}
-                  onValueChange={setAssignedTo}
-                  style={styles.picker}
-                  dropdownIconColor="#2C3E50"
-                  enabled={developers.length > 0}
-                >
-                  <Picker.Item label="Select a developer" value="" />
-                  {developers.map(dev => (
-                    <Picker.Item 
-                      key={dev.id} 
-                      label={dev.name} 
-                      value={dev.id} 
-                    />
-                  ))}
-                </Picker>
-              </View>
-              {developers.length === 0 && (
-                <Text style={styles.errorText}>No developers available. Please try again later.</Text>
-              )}
-            </View>
+            {/* Use the new DeveloperDropdown component */}
+            <DeveloperDropdown 
+              developers={developers}
+              assignedTo={assignedTo}
+              onSelectDeveloper={handleSelectDeveloper}
+              onClearSelection={handleClearSelection}
+            />
 
             <View style={styles.detailSection}>
               <Text style={styles.label}>Assigner Comment:</Text>
@@ -527,27 +637,33 @@ const RequestDetailScreen = () => {
                 value={assignerComment}
                 onChangeText={setAssignerComment}
                 placeholder="Enter your comments for the developer..."
+                placeholderTextColor="#9CA3AF"
                 multiline
                 style={styles.textArea}
-                placeholderTextColor="#999"
               />
             </View>
           </View>
 
           {/* Action Buttons */}
           <TouchableOpacity
-            style={[styles.assignBtn, (submitting || developers.length === 0) && styles.assignBtnDisabled]}
-            disabled={submitting || developers.length === 0}
+            style={[styles.assignBtn, (submitting || !assignedTo || !assignerComment) && styles.assignBtnDisabled]}
+            disabled={submitting || !assignedTo || !assignerComment}
             onPress={handleAssign}
           >
-            <LinearGradient colors={['#2C3E50', '#4ECDC4']} style={styles.buttonGradient}>
-              <Text style={styles.buttonText}>
-                {submitting ? 'Assigning...' : 'Assign Request'}
-              </Text>
+            <LinearGradient 
+              colors={['#2C3E50', '#4ECDC4']} 
+              style={styles.buttonGradient}
+            >
+              <View style={styles.buttonContent}>
+                {submitting && (
+                  <ActivityIndicator size="small" color="#fff" style={styles.buttonSpinner} />
+                )}
+                <Text style={styles.buttonText}>
+                  {submitting ? 'Assigning...' : 'Assign Request'}
+                </Text>
+              </View>
             </LinearGradient>
           </TouchableOpacity>
-
-         
         </ScrollView>
       </View>
     </DrawerLayoutAndroid>
@@ -571,6 +687,7 @@ const priorityColor = (priority) => {
     default: return '#374151';
   }
 };
+
 
 const styles = StyleSheet.create({
   container: { 
@@ -630,7 +747,6 @@ const styles = StyleSheet.create({
     padding: 8,
   },
 
-
   // Detail Card
   detailCard: {
     backgroundColor: '#fff',
@@ -688,7 +804,7 @@ const styles = StyleSheet.create({
     borderLeftColor: '#4ECDC4',
   },
 
-  // Input and Picker
+  // Input and TextArea
   textArea: {
     backgroundColor: '#F9FAFB',
     borderRadius: 12,
@@ -700,17 +816,6 @@ const styles = StyleSheet.create({
     color: '#000000',
     height: 100,
     textAlignVertical: 'top',
-  },
-  pickerContainer: {
-    backgroundColor: '#F9FAFB',
-    borderRadius: 12,
-    marginTop: 8,
-    borderWidth: 1,
-    borderColor: '#E5E7EB',
-    overflow: 'hidden',
-  },
-  picker: {
-    height: 50,
   },
 
   // Buttons
@@ -853,6 +958,224 @@ const styles = StyleSheet.create({
   },
   logoutText: {
     color: '#e74c3c',
+  },
+
+  // Enhanced Dropdown Styles
+  dropdownContainer: {
+    marginBottom: 20,
+  },
+  dropdownLabel: {
+    fontWeight: '600',
+    color: '#374151',
+    fontSize: 14,
+    marginBottom: 8,
+  },
+  dropdownTrigger: {
+    backgroundColor: '#F9FAFB',
+    borderRadius: 12,
+    padding: 16,
+    borderWidth: 2,
+    borderColor: '#E5E7EB',
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 3,
+    elevation: 2,
+  },
+  dropdownTriggerEmpty: {
+    borderColor: '#D1D5DB',
+  },
+  dropdownTriggerText: {
+    fontSize: 16,
+    color: '#2C3E50',
+    fontWeight: '500',
+  },
+  dropdownTriggerPlaceholder: {
+    color: '#9CA3AF',
+  },
+
+  // Modal Styles
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'flex-end',
+  },
+  modalContent: {
+    backgroundColor: '#fff',
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    maxHeight: '80%',
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F3F4F6',
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#2C3E50',
+  },
+  modalCloseButton: {
+    padding: 4,
+  },
+
+  // Developers List Styles
+  developersList: {
+    maxHeight: 400,
+  },
+  developerItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    padding: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F3F4F6',
+  },
+  developerItemSelected: {
+    backgroundColor: '#F0F9FF',
+    borderLeftWidth: 4,
+    borderLeftColor: '#4ECDC4',
+  },
+  lastDeveloperItem: {
+    borderBottomWidth: 0,
+  },
+  developerInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+  },
+  developerAvatar: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#E5E7EB',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12,
+  },
+  developerAvatarSelected: {
+    backgroundColor: '#4ECDC4',
+  },
+  developerAvatarText: {
+    color: '#6B7280',
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+  developerAvatarTextSelected: {
+    color: '#fff',
+  },
+  developerDetails: {
+    flex: 1,
+  },
+  developerName: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#2C3E50',
+    marginBottom: 2,
+  },
+  developerNameSelected: {
+    color: '#4ECDC4',
+  },
+  developerId: {
+    fontSize: 12,
+    color: '#6B7280',
+  },
+
+  // Selected Developer Preview
+  selectedDeveloperPreview: {
+    marginTop: 12,
+  },
+  selectedDeveloperBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F0F9FF',
+    padding: 12,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#4ECDC4',
+    alignSelf: 'flex-start',
+  },
+  selectedDeveloperAvatar: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: '#4ECDC4',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 8,
+  },
+  selectedDeveloperAvatarText: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: 'bold',
+  },
+  selectedDeveloperName: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#2C3E50',
+    marginRight: 8,
+  },
+  clearSelectionButton: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    backgroundColor: '#F3F4F6',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+
+  // Empty State
+  emptyState: {
+    padding: 40,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  emptyStateText: {
+    fontSize: 16,
+    color: '#6B7280',
+    marginTop: 12,
+    fontWeight: '500',
+  },
+  emptyStateSubtext: {
+    fontSize: 14,
+    color: '#9CA3AF',
+    marginTop: 4,
+    textAlign: 'center',
+  },
+
+  // Modal Footer
+  modalFooter: {
+    padding: 20,
+    borderTopWidth: 1,
+    borderTopColor: '#F3F4F6',
+  },
+  cancelButton: {
+    padding: 16,
+    alignItems: 'center',
+    borderRadius: 12,
+    backgroundColor: '#F3F4F6',
+  },
+  cancelButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#6b8071ff',
+  },
+
+  // Button Enhancements
+  buttonContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  buttonSpinner: {
+    marginRight: 8,
   },
 });
 
