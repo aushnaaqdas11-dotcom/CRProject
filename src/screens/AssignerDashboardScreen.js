@@ -12,14 +12,14 @@ import {
   StatusBar,
   DrawerLayoutAndroid,
   RefreshControl,
-  Alert
+  Alert,
 } from 'react-native';
 import { useAuth } from '../hooks/redux';
 import { useNavigation } from '@react-navigation/native';
 import * as Animatable from 'react-native-animatable';
 import LinearGradient from 'react-native-linear-gradient';
 import Icon from 'react-native-vector-icons/FontAwesome';
-import { Colors } from '../styles/theme';
+import Toast from 'react-native-toast-message';
 
 const { width } = Dimensions.get('window');
 
@@ -35,21 +35,31 @@ const AssignerDashboardScreen = () => {
   const [filter, setFilter] = useState('all');
   const [error, setError] = useState(null);
 
+  // CORRECT WAY: Use userApi.assigner
   const fetchRequests = async () => {
     try {
       setLoading(true);
-      const res = await userApi.getProjectRequests();
+      setError(null);
+
+      // CORRECT API CALL
+      const res = await userApi.assigner.getRequests();
+
       if (res.data.success) {
         setRequests(res.data.requests || []);
-        setError(null);
       } else {
-        setError(res.data.message || 'Failed to load requests.');
+        setError(res.data.message || 'No requests found');
         setRequests([]);
       }
     } catch (err) {
-      console.error('Assigner requests error:', err);
-      setError(err.response?.data?.message || 'Failed to load requests. Please check network.');
+      console.error('Assigner fetch error:', err);
+      const msg = err.response?.data?.message || err.message || 'Network Error';
+      setError(msg);
       setRequests([]);
+      Toast.show({
+        type: 'error',
+        text1: 'Failed to load requests',
+        text2: msg,
+      });
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -65,37 +75,23 @@ const AssignerDashboardScreen = () => {
     fetchRequests();
   }, []);
 
-  const openDrawer = () => {
-    drawerRef.current?.openDrawer();
-  };
-
-  const closeDrawer = () => {
-    drawerRef.current?.closeDrawer();
-  };
+  const openDrawer = () => drawerRef.current?.openDrawer();
+  const closeDrawer = () => drawerRef.current?.closeDrawer();
 
   const handleLogout = async () => {
-    Alert.alert(
-      'Logout',
-      'Are you sure you want to logout?',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Logout',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              await logout();
-              navigation.navigate('Login');
-            } catch (error) {
-              Alert.alert('Error', 'Failed to logout');
-            }
-          }
-        }
-      ]
-    );
+    Alert.alert('Logout', 'Are you sure?', [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Logout',
+        style: 'destructive',
+        onPress: async () => {
+          await logout();
+          navigation.reset({ index: 0, routes: [{ name: 'Login' }] });
+        },
+      },
+    ]);
   };
 
-  // Move navigationView outside of conditional returns
   const navigationView = (
     <View style={styles.drawerContainer}>
       <LinearGradient
@@ -106,59 +102,23 @@ const AssignerDashboardScreen = () => {
           <View style={styles.userAvatar}>
             <Icon name="user" size={40} color="#fff" />
           </View>
-          <Text style={styles.drawerUserName}>
-            {user?.name || 'Assigner'}
-          </Text>
+          <Text style={styles.drawerUserName}>{user?.name || 'Assigner'}</Text>
           <Text style={styles.drawerUserRole}>Assigner</Text>
         </View>
       </LinearGradient>
 
       <View style={styles.drawerMenu}>
-        <TouchableOpacity 
-          style={styles.drawerItem}
-          onPress={() => {
-            closeDrawer();
-          }}
-        >
+        <TouchableOpacity style={styles.drawerItem} onPress={closeDrawer}>
           <Icon name="home" size={20} color="#2C3E50" />
           <Text style={styles.drawerItemText}>Dashboard</Text>
         </TouchableOpacity>
 
-        <TouchableOpacity 
-          style={styles.drawerItem}
-          onPress={() => {
-            closeDrawer();
-            // Add navigation for assigner specific screens
-          }}
-        >
-          <Icon name="tasks" size={20} color="#2C3E50" />
-          <Text style={styles.drawerItemText}>My Projects</Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity 
-          style={styles.drawerItem}
-          onPress={() => {
-            closeDrawer();
-            // Add navigation for assigner specific screens
-          }}
-        >
+        <TouchableOpacity style={styles.drawerItem} onPress={closeDrawer}>
           <Icon name="list-alt" size={20} color="#2C3E50" />
-          <Text style={styles.drawerItemText}>Requests</Text>
+          <Text style={styles.drawerItemText}>All Requests</Text>
         </TouchableOpacity>
 
-        <View style={styles.drawerDivider} />
-
-        <TouchableOpacity 
-          style={styles.drawerItem}
-          onPress={() => {
-            closeDrawer();
-            // Add settings navigation here
-          }}
-        >
-          
-        </TouchableOpacity>
-
-        <TouchableOpacity 
+        <TouchableOpacity
           style={[styles.drawerItem, styles.logoutDrawerItem]}
           onPress={() => {
             closeDrawer();
@@ -172,55 +132,77 @@ const AssignerDashboardScreen = () => {
     </View>
   );
 
-  const filteredRequests = requests.filter((item) => {
+  const filteredRequests = requests.filter(item => {
     const statusMatch =
-      filter === 'all' ? true : item.status.toLowerCase() === filter;
+      filter === 'all' || item.status?.toLowerCase() === filter;
     const searchMatch =
-      item.user?.name?.toLowerCase().includes(search.toLowerCase()) ||
-      item.project?.name?.toLowerCase().includes(search.toLowerCase()) ||
-      item.request_details?.toLowerCase().includes(search.toLowerCase());
+      (item.user?.name?.toLowerCase() || '').includes(search.toLowerCase()) ||
+      (item.project?.name?.toLowerCase() || '').includes(
+        search.toLowerCase(),
+      ) ||
+      (item.request_details?.toLowerCase() || '').includes(
+        search.toLowerCase(),
+      );
     return statusMatch && searchMatch;
   });
 
   const stats = {
     total: requests.length,
-    pending: requests.filter(r => r.status.toLowerCase() === 'pending').length,
-    inProgress: requests.filter(r => r.status.toLowerCase() === 'inprogress').length,
-    completed: requests.filter(r => r.status.toLowerCase() === 'completed').length,
-  };
-
-  const retryFetch = () => {
-    setError(null);
-    fetchRequests();
+    pending: requests.filter(r => r.status?.toLowerCase() === 'pending').length,
+    inprogress: requests.filter(r => r.status?.toLowerCase() === 'inprogress')
+      .length,
+    completed: requests.filter(r => r.status?.toLowerCase() === 'completed')
+      .length,
   };
 
   const renderRequest = ({ item, index }) => (
-    <Animatable.View 
-      animation="fadeInUp" 
-      duration={600} 
+    <Animatable.View
+      animation="fadeInUp"
+      duration={600}
       delay={index * 100}
       style={styles.requestCard}
     >
-      <LinearGradient colors={['#ffffff', '#f8f9fa', '#ffffff']} style={styles.cardGradient}>
+      <LinearGradient
+        colors={['#ffffff', '#f8f9fa', '#ffffff']}
+        style={styles.cardGradient}
+      >
         <View style={styles.requestHeader}>
-          <Text style={styles.projectName}>{item.project?.name || 'N/A'}</Text>
-          <Text style={styles.userName}>{item.user?.name || 'N/A'}</Text>
+          <Text style={styles.projectName}>
+            {item.project?.name || 'Unknown Project'}
+          </Text>
+          <Text style={styles.userName}>
+            {item.user?.name || 'Unknown User'}
+          </Text>
         </View>
-        <Text style={styles.issue}>{item.request_details}</Text>
+        <Text style={styles.issue} numberOfLines={2}>
+          {item.request_details || 'No details'}
+        </Text>
+
         <View style={styles.badgesRow}>
-          <Text style={[styles.statusBadge, statusColors[item.status?.toLowerCase()]]}>
-            {item.status}
+          <Text
+            style={[
+              styles.statusBadge,
+              statusColors[item.status?.toLowerCase()],
+            ]}
+          >
+            {item.status || 'unknown'}
           </Text>
-          <Text style={[styles.priorityBadge, priorityColors[item.priority?.toLowerCase()]]}>
-            {item.priority}
-          </Text>
+          {item.pricing ? (
+            <Text style={styles.pricingBadge}>₹{item.pricing}</Text>
+          ) : null}
         </View>
+
         <TouchableOpacity
           style={styles.viewBtn}
-          onPress={() => navigation.navigate('RequestDetail', { requestId: item.id })}
+          onPress={() =>
+            navigation.navigate('RequestDetail', { requestId: item.id })
+          }
         >
-          <LinearGradient colors={['#2C3E50', '#4ECDC4']} style={styles.viewBtnGradient}>
-            <Text style={styles.viewBtnText}>View</Text>
+          <LinearGradient
+            colors={['#2C3E50', '#4ECDC4']}
+            style={styles.viewBtnGradient}
+          >
+            <Text style={styles.viewBtnText}>View Details</Text>
           </LinearGradient>
         </TouchableOpacity>
       </LinearGradient>
@@ -229,27 +211,113 @@ const AssignerDashboardScreen = () => {
 
   const EmptyState = () => (
     <Animatable.View animation="fadeIn" style={styles.emptyState}>
+      <Icon name="inbox" size={60} color="#ccc" />
       <Text style={styles.emptyStateTitle}>No Requests Found</Text>
       <Text style={styles.emptyStateText}>
-        {filter === 'all' 
-          ? 'There are no change requests available at the moment.'
-          : `No ${filter} requests found. Try changing the filter.`
-        }
+        {filter === 'all' ? 'No requests available' : `No ${filter} requests`}
       </Text>
       <TouchableOpacity style={styles.refreshButton} onPress={fetchRequests}>
-        <LinearGradient colors={['#2C3E50', '#4ECDC4']} style={styles.refreshButtonGradient}>
+        <LinearGradient
+          colors={['#2C3E50', '#4ECDC4']}
+          style={styles.refreshButtonGradient}
+        >
           <Text style={styles.refreshButtonText}>Refresh</Text>
         </LinearGradient>
       </TouchableOpacity>
     </Animatable.View>
   );
 
-  // Move the conditional return to the very end
+  // ONLY CHANGE: Render all content in the FlatList instead of nesting
+  const renderContent = () => (
+    <>
+      <LinearGradient colors={['#2C3E50', '#4ECDC4']} style={styles.header}>
+        <Text style={styles.welcomeText}>
+          Welcome, {user?.name || 'Assigner'}
+        </Text>
+        <Text style={styles.roleText}>Manage Change Requests</Text>
+      </LinearGradient>
+
+      {error && (
+        <View style={styles.errorContainer}>
+          <Text style={styles.errorText}>{error}</Text>
+          <TouchableOpacity
+            style={styles.retryButton}
+            onPress={fetchRequests}
+          >
+            <Text style={styles.retryText}>Retry</Text>
+          </TouchableOpacity>
+        </View>
+      )}
+
+      <View style={styles.statsContainer}>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+          {Object.entries(stats).map(([key, value]) => (
+            <View key={key} style={styles.statCard}>
+              <Text style={[styles.statValue, { color: statColors[key] }]}>
+                {value}
+              </Text>
+              <Text style={styles.statLabel}>
+                {key === 'total'
+                  ? 'Total'
+                  : key === 'inprogress'
+                  ? 'In Progress'
+                  : key.charAt(0).toUpperCase() + key.slice(1)}
+              </Text>
+            </View>
+          ))}
+        </ScrollView>
+      </View>
+
+      <View style={styles.searchFilterContainer}>
+        <View style={styles.searchWrapper}>
+          <Icon
+            name="search"
+            size={16}
+            color="#4ECDC4"
+            style={styles.searchIcon}
+          />
+          <TextInput
+            placeholder="Search requests..."
+            value={search}
+            onChangeText={setSearch}
+            style={styles.searchInput}
+          />
+        </View>
+
+        <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+          {['all', 'pending', 'inprogress', 'completed'].map(f => (
+            <TouchableOpacity
+              key={f}
+              onPress={() => setFilter(f)}
+              style={[
+                styles.filterBtn,
+                filter === f && styles.filterBtnActive,
+              ]}
+            >
+              <Text
+                style={[
+                  styles.filterText,
+                  filter === f && styles.filterTextActive,
+                ]}
+              >
+                {f === 'all'
+                  ? 'All'
+                  : f === 'inprogress'
+                  ? 'In Progress'
+                  : f.charAt(0).toUpperCase() + f.slice(1)}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
+      </View>
+    </>
+  );
+
   if (loading && !refreshing) {
     return (
       <View style={styles.loadingContainer}>
         <ActivityIndicator size="large" color="#2C3E50" />
-        <Text style={styles.loadingText}>Loading Assigner Dashboard...</Text>
+        <Text style={styles.loadingText}>Loading your requests...</Text>
       </View>
     );
   }
@@ -263,172 +331,49 @@ const AssignerDashboardScreen = () => {
     >
       <View style={styles.container}>
         <StatusBar backgroundColor="#2C3E50" barStyle="light-content" />
-        
-        {/* Top Navbar - Same as Admin Dashboard */}
+
         <View style={styles.navbar}>
-          <TouchableOpacity 
-            style={styles.menuButton}
-            onPress={openDrawer}
-          >
+          <TouchableOpacity style={styles.menuButton} onPress={openDrawer}>
             <Icon name="bars" size={24} color="#fff" />
           </TouchableOpacity>
-          
-          <View style={styles.navbarCenter}>
-            <Text style={styles.navbarTitle}>Assigner Dashboard</Text>
-          </View>
-          
-          <View style={styles.navbarRight}>
-            <TouchableOpacity style={styles.navbarIcon}>
-              <Icon name="user" size={20} color="#fff" />
-            </TouchableOpacity>
-          </View>
+          <Text style={styles.navbarTitle}>Assigner Dashboard</Text>
+          <View style={styles.navbarRight} />
+        <View style={styles.navbarRight}>
+          <TouchableOpacity style={styles.navbarIcon}>
+            <Icon name="user" size={20} color="#fff" />
+              </TouchableOpacity>
+                </View>
         </View>
 
-        <ScrollView 
+        {/* ONLY CHANGE: Use FlatList instead of ScrollView + FlatList nesting */}
+        <FlatList
+          data={filteredRequests}
+          keyExtractor={item => item.id.toString()}
+          renderItem={renderRequest}
+          ListEmptyComponent={EmptyState}
+          ListHeaderComponent={renderContent}
           refreshControl={
             <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
           }
+          contentContainerStyle={styles.listContent}
           showsVerticalScrollIndicator={false}
-          contentContainerStyle={styles.scrollContent}
-        >
-          {/* Header - Matching Admin Dashboard */}
-          <LinearGradient
-            colors={['#2C3E50', '#4ECDC4']}
-            style={styles.header}
-          >
-            <View style={styles.headerContent}>
-              <View style={styles.headerText}>
-                <Text style={styles.welcomeText}>
-                  Welcome, {user?.name || 'Assigner'}
-                </Text>
-                <Text style={styles.roleText}>Manage your project requests</Text>
-              </View>
-            </View>
-          </LinearGradient>
-
-          {error && (
-            <Animatable.View animation="fadeIn" style={styles.errorContainer}>
-              <Text style={styles.errorText}>{error}</Text>
-              <TouchableOpacity style={styles.retryButton} onPress={retryFetch}>
-                <LinearGradient colors={['#2C3E50', '#4ECDC4']} style={styles.retryButtonGradient}>
-                  <Text style={styles.retryText}>Retry</Text>
-                </LinearGradient>
-              </TouchableOpacity>
-            </Animatable.View>
-          )}
-
-          {/* Stats Section */}
-          <View style={styles.statsContainer}>
-            <ScrollView 
-              horizontal 
-              showsHorizontalScrollIndicator={false} 
-              contentContainerStyle={styles.statsScrollContent}
-            >
-              {Object.entries(stats).map(([key, value]) => (
-                <View key={key} style={styles.statCard}>
-                  <LinearGradient colors={['#ffffff', '#f8f9fa', '#ffffff']} style={styles.statCardGradient}>
-                    <Text style={[styles.statValue, { color: statColors[key] }]}>
-                      {value}
-                    </Text>
-                    <Text style={styles.statLabel}>
-                      {key === 'total' ? 'Total Requests' : 
-                       key === 'pending' ? 'Pending' : 
-                       key === 'inProgress' ? 'In Progress' : 'Completed'}
-                    </Text>
-                  </LinearGradient>
-                </View>
-              ))}
-            </ScrollView>
-          </View>
-
-          {/* Search and Filter Section */}
-          <View style={styles.searchFilterContainer}>
-            <View style={styles.searchWrapper}>
-              <Icon name="search" size={16} color="#4ECDC4" style={styles.searchIcon} />
-              <TextInput
-                placeholder="Search requests..."
-                value={search}
-                onChangeText={setSearch}
-                style={styles.searchInput}
-                placeholderTextColor="#666"
-              />
-            </View>
-            
-            <ScrollView 
-              horizontal 
-              showsHorizontalScrollIndicator={false}
-              style={styles.filterScroll}
-            >
-              <View style={styles.filterContainer}>
-                {['all', 'pending', 'inprogress', 'completed'].map(f => (
-                  <TouchableOpacity
-                    key={f}
-                    onPress={() => setFilter(f)}
-                    style={[
-                      styles.filterBtn, 
-                      filter === f && styles.filterBtnActive
-                    ]}
-                  >
-                    <Text style={[
-                      styles.filterText,
-                      filter === f && styles.filterTextActive
-                    ]}>
-                      {f === 'all' ? 'All Requests' : 
-                       f === 'inprogress' ? 'In Progress' : 
-                       f.charAt(0).toUpperCase() + f.slice(1)}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
-            </ScrollView>
-          </View>
-
-          {/* Content Area */}
-          <View style={styles.contentContainer}>
-            {loading ? (
-              <View style={styles.loadingContainer}>
-                <ActivityIndicator size="large" color="#2C3E50" />
-                <Text style={styles.loadingText}>Loading requests...</Text>
-              </View>
-            ) : (
-              <FlatList
-                data={filteredRequests}
-                keyExtractor={item => item.id.toString()}
-                renderItem={renderRequest}
-                ListEmptyComponent={EmptyState}
-                contentContainerStyle={[
-                  styles.listContent,
-                  filteredRequests.length === 0 && styles.emptyListContent
-                ]}
-                scrollEnabled={false}
-                showsVerticalScrollIndicator={false}
-              />
-            )}
-          </View>
-        </ScrollView>
+        />
       </View>
     </DrawerLayoutAndroid>
   );
 };
 
-
+// Colors & Styles (same as before, just cleaned up)
 const statColors = {
   total: '#2C3E50',
   pending: '#F59E0B',
-  inProgress: '#3B82F6',
+  inprogress: '#3B82F6',
   completed: '#10B981',
 };
-
 const statusColors = {
   pending: { backgroundColor: '#FEF3C7', color: '#92400E' },
   inprogress: { backgroundColor: '#DBEAFE', color: '#1E40AF' },
   completed: { backgroundColor: '#D1FAE5', color: '#065F46' },
-};
-
-const priorityColors = {
-  high: { color: '#DC2626' },
-  normal: { color: '#3B82F6' },
-  low: { color: '#059669' },
 };
 
 const styles = StyleSheet.create({
@@ -477,6 +422,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   navbarTitle: {
+    paddingLeft:40,
     fontSize: 18,
     fontWeight: 'bold',
     color: '#fff',
@@ -586,7 +532,7 @@ const styles = StyleSheet.create({
   // Rest of the existing styles remain the same
   statsContainer: {
     padding: 20,
-    marginTop: -20,
+    marginTop: -13,
   },
   statsScrollContent: {
     paddingHorizontal: 8,
@@ -599,11 +545,12 @@ const styles = StyleSheet.create({
     padding: 20,
     alignItems: 'center',
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
+    shadowOffset: { width: 0, height: 12 },
     shadowOpacity: 0.1,
     shadowRadius: 12,
     elevation: 5,
-    marginBottom:9,
+    marginBottom:7,
+    marginHorizontal:5,
   },
   statCardGradient: {
     paddingVertical: 25,
@@ -627,6 +574,7 @@ const styles = StyleSheet.create({
   searchFilterContainer: {
     padding: 20,
     paddingTop: 1,
+    marginTop:-10,
   },
   searchWrapper: {
     flexDirection: 'row',
@@ -643,6 +591,7 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 3,
     elevation: 2,
+    
   },
   searchIcon: {
     marginRight: 10,
@@ -659,7 +608,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: 8,
     paddingHorizontal: 4,
-    marginBottom:2,
+    marginBottom:9,
   },
   filterBtn: { 
     paddingHorizontal: 20,
@@ -675,6 +624,7 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.05,
     shadowRadius: 4,
     elevation: 2,
+    marginBottom:2,
   },
   filterBtnActive: { 
     backgroundColor: '#4ECDC4', 
@@ -697,6 +647,7 @@ const styles = StyleSheet.create({
   },
   listContent: {
     paddingBottom: 20,
+    flexGrow: 1,
   },
   emptyListContent: {
     flexGrow: 1,
@@ -705,6 +656,7 @@ const styles = StyleSheet.create({
   
   // Request Cards
   requestCard: {
+    marginHorizontal:16,
     borderRadius: 16,
     overflow: 'hidden',
     marginBottom: 16,
