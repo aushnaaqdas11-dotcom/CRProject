@@ -19,6 +19,8 @@ import {
 import { adminAPI } from '../../services/apiService';
 import Icon from 'react-native-vector-icons/FontAwesome';
 import { useAuth } from '../../hooks/redux';
+import LinearGradient from 'react-native-linear-gradient';
+
 
 const { width } = Dimensions.get('window');
 
@@ -349,9 +351,15 @@ const EditUser = ({ navigation }) => {
   return (
     <View style={styles.container}>
       {/* Header */}
-      <View style={styles.header}>
+<LinearGradient
+  colors={['#2C3E50', '#4ECDC4']}
+  start={{ x: 0, y: 0 }}
+  end={{ x: 1, y: 0 }}
+  style={styles.header}
+>
+      <View style={styles.headerContent}>
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-          <Icon name="arrow-left" size={20} color="#2C3E50" />
+          <Icon name="arrow-left" size={20} color="#ffffffff" />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Edit Users</Text>
         <TouchableOpacity 
@@ -362,6 +370,7 @@ const EditUser = ({ navigation }) => {
           <Text style={styles.addButtonText}>Add User</Text>
         </TouchableOpacity>
       </View>
+      </LinearGradient>
 
       {/* Search Bar */}
       <View style={styles.searchContainer}>
@@ -468,7 +477,7 @@ const EditUser = ({ navigation }) => {
           style={styles.modalContainer}
           behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         >
-          {/* Modal Header */}
+          {/* Modal Header */} 
           <View style={styles.modalHeader}>
             <TouchableOpacity onPress={closeEditForm} style={styles.modalBackButton}>
               <Icon name="arrow-left" size={20} color="#2C3E50" />
@@ -614,11 +623,8 @@ const EditUser = ({ navigation }) => {
 };
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#F8FAFC',
-    paddingTop: 60,
-  },
+   container: { flex: 1, backgroundColor: '#f5f7fb' },
+
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
@@ -630,15 +636,15 @@ const styles = StyleSheet.create({
     color: '#2C3E50',
     fontSize: 16,
   },
-  header: {
+   headerContent : {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+ header: {
     paddingHorizontal: 20,
-    paddingVertical: 15,
-    backgroundColor: '#fff',
-    borderBottomWidth: 1,
-    borderBottomColor: '#e2e8f0',
+    paddingTop: 45,
+    paddingBottom: 20,
   },
   backButton: {
     padding: 5,
@@ -646,7 +652,7 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: 20,
     fontWeight: 'bold',
-    color: '#2C3E50',
+    color: '#ffffffff',
   },
   addButton: {
     flexDirection: 'row',

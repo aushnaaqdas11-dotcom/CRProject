@@ -10,13 +10,8 @@ import ResolverRequestDetail from '../screens/ResolverRequestDetail';
 import AssignerDashboardScreen from '../screens/AssignerDashboardScreen';
 import RequestDetailScreen from '../screens/RequestDetailScreen';
 import UserHistoryScreen from '../screens/UserHistoryScreen';
-
-
-// Import the Drawer Navigator
-import DrawerNavigator from './DrawerNavigator';
-
 import AdgDashboardScreen from '../screens/AdgDashboardScreen';
-
+import DrawerNavigator from './DrawerNavigator';
 
 const Stack = createStackNavigator();
 
@@ -27,74 +22,61 @@ const AppNavigator = () => {
     loadUser();
   }, [loadUser]);
 
-  // Show splash screen while loading initial auth state
   if (loading) {
     return <SplashScreen />;
   }
 
+  // Function to get screens based on auth
+  const renderScreens = () => {
+    if (!token || !user) {
+      return [
+        <Stack.Screen key="Login" name="Login" component={LoginScreen} />
+      ];
+    }
+
+    const role = parseInt(user.role);
+    
+    switch (role) {
+      case 1: // Admin
+        return [
+          <Stack.Screen key="MainApp" name="MainApp" component={DrawerNavigator} />,
+          <Stack.Screen key="UserHistory" name="UserHistory" component={UserHistoryScreen} />,
+          <Stack.Screen key="RequestDetail" name="RequestDetail" component={RequestDetailScreen} />
+        ];
+      case 2: // User
+        return [
+          <Stack.Screen key="UserDashboard" name="UserDashboard" component={UserDashboard} />,
+          <Stack.Screen key="RequestDetail" name="RequestDetail" component={RequestDetailScreen} />,
+          <Stack.Screen key="UserHistory" name="UserHistory" component={UserHistoryScreen} />
+        ];
+      case 3: // Resolver
+        return [
+          <Stack.Screen key="ResolverDashboard" name="ResolverDashboard" component={ResolverDashboard} />,
+          <Stack.Screen key="ResolverRequestDetail" name="ResolverRequestDetail" component={ResolverRequestDetail} />
+        ];
+      case 4: // Assigner
+        return [
+          <Stack.Screen key="AssignerDashboard" name="AssignerDashboard" component={AssignerDashboardScreen} />,
+          <Stack.Screen key="RequestDetail" name="RequestDetail" component={RequestDetailScreen} />
+        ];
+      case 5: // ADG
+        return [
+          <Stack.Screen key="ADGDashboard" name="ADG Dashboard" component={AdgDashboardScreen} />
+        ];
+      default:
+        return [
+          <Stack.Screen key="UserDashboard" name="UserDashboard" component={UserDashboard} />,
+          <Stack.Screen key="RequestDetail" name="RequestDetail" component={RequestDetailScreen} />,
+          <Stack.Screen key="UserHistory" name="UserHistory" component={UserHistoryScreen} />
+        ];
+    }
+  };
+
   return (
     <NavigationContainer>
       <Stack.Navigator screenOptions={{ headerShown: false }}>
-        {!token || !user ? (
-          // No token or user - Auth screens
-          <>
-            <Stack.Screen name="Login" component={LoginScreen} />
-          </>
-        ) : (
-          // User is authenticated - Show appropriate dashboard based on role
-          (() => {
-            switch (parseInt(user.role)) {
-              case 1: // Admin - Use Drawer Navigator
-                return (
-                  <>
-                    <Stack.Screen name="MainApp" component={DrawerNavigator} />
-                    {/* Keep these as separate stack screens if they need to be outside drawer */}
-                    <Stack.Screen name="UserHistory" component={UserHistoryScreen} />
-                    <Stack.Screen name="RequestDetail" component={RequestDetailScreen} />
-                  </>
-                );
-              case 2: // User
-                return (
-                  <>
-                    <Stack.Screen name="UserDashboard" component={UserDashboard} />
-                    <Stack.Screen name="RequestDetail" component={RequestDetailScreen} />
-                    <Stack.Screen name="UserHistory" component={UserHistoryScreen} />
-                  </>
-                );
-              case 3: // Resolver
-                return (
-                  <>
-                    <Stack.Screen name="ResolverDashboard" component={ResolverDashboard} />
-                    <Stack.Screen name="ResolverRequestDetail" component={ResolverRequestDetail} />
-                  </>
-                );
-              case 4: // Assigner
-                return (
-                  <>
-                    <Stack.Screen name="AssignerDashboard" component={AssignerDashboardScreen} />
-                    <Stack.Screen name="RequestDetail" component={RequestDetailScreen} />
-                  </>
-                );
-                  case 5: // ADG - Add this new case
-                return (
-                  <>
-<Stack.Screen name="ADG Dashboard" component={AdgDashboardScreen} />
-                    {/* Add other screens ADG might need access to */}
-                  </>
-                );
-              default:
-                return (
-                  <>
-                    <Stack.Screen name="UserDashboard" component={UserDashboard} />
-                    <Stack.Screen name="RequestDetail" component={RequestDetailScreen} />
-                    <Stack.Screen name="UserHistory" component={UserHistoryScreen} />
-                  </>
-                );
-            }
-          })()
-        )}
-        {/* Common screens accessible from anywhere */}
-        <Stack.Screen name="Splash" component={SplashScreen} />
+        {renderScreens()}
+        <Stack.Screen key="Splash" name="Splash" component={SplashScreen} />
       </Stack.Navigator>
     </NavigationContainer>
   );

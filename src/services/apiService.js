@@ -1,7 +1,7 @@
 // services/apiService.js
 import axios from 'axios';
 
-const BASE_URL = 'http://10.50.206.142:8000/api';
+const BASE_URL = 'http://10.50.206.179:8000/api';
 
 const apiService = axios.create({
   baseURL: BASE_URL,
@@ -12,7 +12,7 @@ const apiService = axios.create({
   timeout: 120000,
 });
 
-// Don't auto-handle 401 (tum khud handle karoge)
+// Don't auto-handle 401 
 apiService.interceptors.response.use(
   response => response,
   error => Promise.reject(error)
@@ -111,8 +111,19 @@ export const adminAPI = {
   deleteUser: (id) => apiService.delete(`/admin/users/${id}`),
   getRoles: () => apiService.get('/admin/roles'),
   getAssignableUsers: () => apiService.get('/admin/assignable-users'),
-  getProjectsForAssignment: () => apiService.get('/admin/projects'),
+  getProjectsForAssignment: () => apiService.get('/admin/projects-for-assignment'),
   assignProjectsToUser: (data) => apiService.post('/admin/assign-projects', data),
+  
+  // NEW PROJECT MANAGEMENT APIs
+  getProjects: (params = {}) => apiService.get('/admin/projects', { params }),
+  getProject: (id) => apiService.get(`/admin/projects/${id}`),
+  createProject: (data) => apiService.post('/admin/projects', data),
+  updateProject: (id, data) => apiService.put(`/admin/projects/${id}`, data),
+  deleteProject: (id) => apiService.delete(`/admin/projects/${id}`),
+  getProjectStats: () => apiService.get('/admin/projects-stats'),
+  searchProjects: (query) => apiService.get('/admin/projects-search', { params: { q: query } }),
+  getProjectsByType: (type) => apiService.get(`/admin/projects-by-type/${type}`),
+  bulkDeleteProjects: (projectIds) => apiService.post('/admin/projects/bulk-delete', { project_ids: projectIds }),
 };
 
 export const adgAPI = {

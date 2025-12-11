@@ -14,6 +14,7 @@ import {
 } from 'react-native';
 import { adminAPI } from '../../services/apiService';
 import Icon from 'react-native-vector-icons/FontAwesome';
+import LinearGradient from 'react-native-linear-gradient';
 
 const CreateUser = ({ navigation }) => {
   const [loading, setLoading] = useState(false);
@@ -132,13 +133,20 @@ const CreateUser = ({ navigation }) => {
       keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
     >
       {/* Header */}
-      <View style={styles.header}>
+      <LinearGradient
+        colors={['#2C3E50', '#4ECDC4']}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 0 }}
+        style={styles.header}
+      >
+      <View style={styles.headerContent}>
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-          <Icon name="arrow-left" size={20} color="#2C3E50" />
+          <Icon name="arrow-left" size={20} color="#ffffffff" />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Create New User</Text>
         <View style={styles.placeholder} />
       </View>
+      </LinearGradient>
 
       <ScrollView 
         style={styles.scrollView}
@@ -275,20 +283,16 @@ const CreateUser = ({ navigation }) => {
 };
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#F8FAFC',
-  },
-  header: {
+    container: { flex: 1, backgroundColor: '#f5f7fb' },
+   headerContent : {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+ header: {
     paddingHorizontal: 20,
-    paddingVertical: 15,
-    backgroundColor: '#fff',
-    borderBottomWidth: 1,
-    borderBottomColor: '#e2e8f0',
-    paddingTop: Platform.OS === 'ios' ? 50 : 40,
+    paddingTop: 45,
+    paddingBottom: 20,
   },
   backButton: {
     padding: 5,
@@ -296,7 +300,7 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: 20,
     fontWeight: 'bold',
-    color: '#2C3E50',
+    color: '#ffffffff',
   },
   placeholder: {
     width: 30,

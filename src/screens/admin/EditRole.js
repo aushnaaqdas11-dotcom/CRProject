@@ -12,6 +12,8 @@ import {
 } from 'react-native';
 import { adminAPI } from '../../services/apiService';
 import Icon from 'react-native-vector-icons/FontAwesome';
+import LinearGradient from 'react-native-linear-gradient';
+
 
 const EditRole = ({ route, navigation }) => {
   const { roleId } = route.params;

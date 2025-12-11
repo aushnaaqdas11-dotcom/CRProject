@@ -15,6 +15,8 @@ import {
 } from 'react-native';
 import { adminAPI } from '../../services/apiService';
 import Icon from 'react-native-vector-icons/FontAwesome';
+import LinearGradient from 'react-native-linear-gradient';
+
 
 const AssignProjects = ({ navigation }) => {
   const [users, setUsers] = useState([]);
@@ -154,17 +156,22 @@ const AssignProjects = ({ navigation }) => {
   return (
     <View style={styles.container}>
       {/* Header */}
-      <View style={styles.header}>
+      <LinearGradient
+        colors={['#2C3E50', '#4ECDC4']}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 0 }}
+        style={styles.header}
+      >
+      <View style={styles.headerContent}>
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-          <Icon name="arrow-left" size={20} color="#2C3E50" />
+          <Icon name="arrow-left" size={20} color="#ffffffff" />
         </TouchableOpacity>
-        <View style={styles.headerContent}>
           <Text style={styles.headerTitle}>Assign Projects</Text>
+          </View>
           <Text style={styles.headerSubtitle}>
             View and manage all users eligible for project assignments
           </Text>
-        </View>
-      </View>
+      </LinearGradient>
 
       {/* Search Bar */}
       <View style={styles.searchContainer}>
@@ -270,11 +277,7 @@ const AssignProjects = ({ navigation }) => {
 };
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#F8FAFC',
-    paddingTop: 60,
-  },
+  container: { flex: 1, backgroundColor: '#f5f7fb' },
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
@@ -286,31 +289,31 @@ const styles = StyleSheet.create({
     color: '#2C3E50',
     fontSize: 16,
   },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
+  headerContent : {
+  flexDirection: 'row', alignItems: 'center'
+  },
+ header: {
     paddingHorizontal: 20,
-    paddingVertical: 15,
-    backgroundColor: '#fff',
-    borderBottomWidth: 1,
-    borderBottomColor: '#e2e8f0',
+    paddingTop: 45,
+    paddingBottom: 15,
   },
   backButton: {
     padding: 5,
     marginRight: 15,
   },
-  headerContent: {
-    flex: 1,
-  },
+ 
   headerTitle: {
-    fontSize: 20,
+    fontSize: 22,
     fontWeight: 'bold',
-    color: '#2C3E50',
+    color: '#ffffffff',
     marginBottom: 5,
   },
   headerSubtitle: {
-    fontSize: 14,
-    color: '#666',
+    fontSize: 16,
+    color: '#fff',
+    opacity: 0.9,
+    marginLeft:39,
+    fontStyle:'italic',
   },
   searchContainer: {
     flexDirection: 'row',

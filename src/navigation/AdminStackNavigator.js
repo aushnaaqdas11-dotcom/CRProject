@@ -8,6 +8,8 @@ import AssignProjects from '../screens/admin/AssignProjects';
 import CreateUser from '../screens/admin/CreateUser';
 import EditUser from '../screens/admin/EditUser';
 import EditRole from '../screens/admin/EditRole';
+import ProjectManagement from '../screens/admin/ProjectManagement'; // ADD THIS
+
 
 const Stack = createStackNavigator();
 
@@ -21,6 +23,7 @@ const AdminStackNavigator = () => {
       <Stack.Screen name="CreateUser" component={CreateUser} />
       <Stack.Screen name="EditUser" component={EditUser} />
       <Stack.Screen name="EditRole" component={EditRole} />
+      <Stack.Screen name="ProjectManagement" component={ProjectManagement} /> {/* ADD THIS */}
     </Stack.Navigator>
   );
 };

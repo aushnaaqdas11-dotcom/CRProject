@@ -101,6 +101,15 @@ const loadDashboard = async () => {
       icon: 'tasks',
       color: '#ff6b6b',
       gradient: ['#ff9e44', '#ff6b6b']
+    },
+     {
+      id: 5,
+      title: 'Add Projects',
+      description: 'View, add, and edit projects',
+      route: 'ProjectManagement', // New screen we'll create
+      icon: 'folder-open',
+      color: '#0ba3f5',
+      gradient: ['#0ba3f5', '#44efdb']
     }
   ];
 

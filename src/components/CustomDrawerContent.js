@@ -92,7 +92,13 @@ const CustomDrawerContent = (props) => {
           <Icon name="tasks" size={20} color="#2C3E50" />
           <Text style={styles.drawerItemText}>Assign Projects</Text>
         </TouchableOpacity>
-
+        <TouchableOpacity 
+          style={styles.drawerItem}
+          onPress={() => handleNavigation('ProjectManagement')}
+        >
+          <Icon name="folder-open" size={20} color="#2C3E50" />
+          <Text style={styles.drawerItemText}>Project Management</Text>
+        </TouchableOpacity>
         <TouchableOpacity 
           style={styles.drawerItem}
           onPress={() => handleNavigation('CreateUser')}
