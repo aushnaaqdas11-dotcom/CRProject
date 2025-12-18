@@ -14,8 +14,9 @@ import {
 } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
 import Icon from 'react-native-vector-icons/FontAwesome';
-import { adminAPI } from '../services/apiService';
-import { useAuth } from '../hooks/redux'; 
+import { adminAPI } from '../../services/apiService';
+import { useAuth } from '../../hooks/redux'; 
+import Footer from '../../components/Footer'; // Add this import
 
 const { width } = Dimensions.get('window');
 
@@ -110,7 +111,17 @@ const loadDashboard = async () => {
       icon: 'folder-open',
       color: '#0ba3f5',
       gradient: ['#0ba3f5', '#44efdb']
-    }
+    },
+    {
+    id: 6,
+    title: 'Assign to Users',
+    description: 'Assign projects to multiple users',
+    route: 'AssignProjectsToUsers', // New route
+    icon: 'user-check',
+    color: '#9C27B0',
+    gradient: ['#9C27B0', '#E91E63']
+  }
+    
   ];
 
   const handleModulePress = (module) => {
@@ -246,7 +257,8 @@ const loadDashboard = async () => {
             ))}
           </View>
         </View>
-      </ScrollView>
+      <Footer />
+    </ScrollView>
     </View>
   );
 };

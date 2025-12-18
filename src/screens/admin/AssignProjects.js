@@ -16,6 +16,8 @@ import {
 import { adminAPI } from '../../services/apiService';
 import Icon from 'react-native-vector-icons/FontAwesome';
 import LinearGradient from 'react-native-linear-gradient';
+import Footer from '../../components/Footer'; // Add this import
+
 
 
 const AssignProjects = ({ navigation }) => {
@@ -267,11 +269,12 @@ const AssignProjects = ({ navigation }) => {
                     Assign ({selectedProjects.length})
                   </Text>
                 )}
-              </TouchableOpacity>
+              </TouchableOpacity>              
             </View>
           </View>
         </View>
       </Modal>
+    <Footer />
     </View>
   );
 };

@@ -10,31 +10,34 @@ const CustomDrawerContent = (props) => {
   const { navigation } = props; // Use navigation from props instead of useNavigation hook
   const { user, logout } = useAuth();
 
-  const handleLogout = () => {
-    Alert.alert(
-      'Logout',
-      'Are you sure you want to logout?',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Logout',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              await logout();
-              navigation.dispatch(DrawerActions.closeDrawer());
-              // Navigate to Login - you might need to use a different navigation method
-              // depending on your setup
-              navigation.navigate('Login');
-            } catch (error) {
-              Alert.alert('Error', 'Failed to logout');
-            }
+const handleLogout = () => {
+  Alert.alert(
+    'Logout',
+    'Are you sure you want to logout?',
+    [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Logout',
+        style: 'destructive',
+        onPress: async () => {
+          try {
+            // 1. Close the drawer first
+            navigation.dispatch(DrawerActions.closeDrawer());
+            
+            // 2. Call logout - this clears tokens and AppNavigator will show Login automatically
+            await logout();
+            
+            // ✅ CRITICAL: DO NOT navigate to 'Login' here
+            // The logout() function already clears tokens
+            // AppNavigator will automatically detect token is null and show Login screen
+          } catch (error) {
+            Alert.alert('Error', 'Failed to logout');
           }
         }
-      ]
-    );
-  };
-
+      }
+    ]
+  );
+};
   // Function to handle navigation within the drawer
   const handleNavigation = (screenName) => {
     // Navigate to the screen
@@ -92,13 +95,15 @@ const CustomDrawerContent = (props) => {
           <Icon name="tasks" size={20} color="#2C3E50" />
           <Text style={styles.drawerItemText}>Assign Projects</Text>
         </TouchableOpacity>
-        <TouchableOpacity 
+         
+          <TouchableOpacity 
           style={styles.drawerItem}
           onPress={() => handleNavigation('ProjectManagement')}
         >
-          <Icon name="folder-open" size={20} color="#2C3E50" />
+          <Icon name="folder" size={20} color="#2C3E50" />
           <Text style={styles.drawerItemText}>Project Management</Text>
         </TouchableOpacity>
+        
         <TouchableOpacity 
           style={styles.drawerItem}
           onPress={() => handleNavigation('CreateUser')}

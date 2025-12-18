@@ -15,6 +15,8 @@ import {
 import { adminAPI } from '../../services/apiService';
 import Icon from 'react-native-vector-icons/FontAwesome';
 import LinearGradient from 'react-native-linear-gradient';
+import Footer from '../../components/Footer'; // Add this import
+
 
 const CreateUser = ({ navigation }) => {
   const [loading, setLoading] = useState(false);
@@ -277,6 +279,8 @@ const CreateUser = ({ navigation }) => {
             )}
           </TouchableOpacity>
         </View>
+              <Footer />
+
       </ScrollView>
     </KeyboardAvoidingView>
   );

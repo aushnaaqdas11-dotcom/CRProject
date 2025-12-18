@@ -20,6 +20,8 @@ import { adminAPI } from '../../services/apiService';
 import Icon from 'react-native-vector-icons/FontAwesome';
 import { useAuth } from '../../hooks/redux';
 import LinearGradient from 'react-native-linear-gradient';
+import Footer from '../../components/Footer'; // Add this import
+
 
 
 const { width } = Dimensions.get('window');
@@ -617,7 +619,9 @@ const EditUser = ({ navigation }) => {
             </View>
           </ScrollView>
         </KeyboardAvoidingView>
-      </Modal>
+                                  <Footer />
+
+      </Modal>      
     </View>
   );
 };

@@ -1,14 +1,16 @@
 import { useDispatch, useSelector } from 'react-redux';
 import { useCallback } from 'react';
-import { loginUser, logoutUser, loadUserFromStorage, clearError } from '../store/slices/authSlice';
+import { loginUser, logoutUser, loadUserFromStorage, clearError, setAuthState } from '../store/slices/authSlice';
 import apiService from '../services/apiService';
 
 export const useAuth = () => {
   const dispatch = useDispatch();
   const auth = useSelector((state) => state.auth);
 
-  const login = useCallback((login, password) => {
-    return dispatch(loginUser({ login, password }));
+  // ✅ FIXED: All 4 parameters
+  const login = useCallback((login, password, captcha, captchaKey) => {
+    console.log('🔐 useAuth: Dispatching login with CAPTCHA');
+    return dispatch(loginUser({ login, password, captcha, captchaKey }));
   }, [dispatch]);
 
   const logout = useCallback(() => {
@@ -16,6 +18,7 @@ export const useAuth = () => {
   }, [dispatch]);
 
   const loadUser = useCallback(() => {
+    console.log('🔐 useAuth: Loading user from storage');
     return dispatch(loadUserFromStorage());
   }, [dispatch]);
 
@@ -23,22 +26,10 @@ export const useAuth = () => {
     dispatch(clearError());
   }, [dispatch]);
 
-  const getRedirectPath = useCallback(() => {
-    if (!auth.user) return 'Login';
-    
-    switch (parseInt(auth.user.role)) {
-      case 1:
-        return 'AdminDashboard';
-      case 2:
-        return 'UserDashboard';
-      case 3:
-        return 'ResolverDashboard';
-      case 4:
-        return 'AssignerDashboard';
-      default:
-        return 'UserDashboard';
-    }
-  }, [auth.user]);
+  // ✅ NEW: Manual auth state setter (for debugging)
+  const manualSetAuth = useCallback((token, user) => {
+    dispatch(setAuthState({ token, user }));
+  }, [dispatch]);
 
   return {
     user: auth.user,
@@ -49,7 +40,6 @@ export const useAuth = () => {
     logout,
     loadUser,
     clearError: clearAuthError,
-    getRedirectPath,
-    userApi: apiService,
+    manualSetAuth, // For debugging
   };
 };

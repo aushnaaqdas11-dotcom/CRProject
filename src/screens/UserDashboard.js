@@ -11,11 +11,15 @@ import LinearGradient from 'react-native-linear-gradient';
 import Icon from 'react-native-vector-icons/FontAwesome';
 import { Colors } from '../styles/theme';
 import * as Animatable from 'react-native-animatable';
+import { userAPI } from '../services/apiService'; // Import the userAPI object
+import Footer from '../components/Footer'; // Add this import
+
+
 
 const { width, height } = Dimensions.get('window');
 
 const UserDashboard = () => {
-  const { user, userApi, logout } = useAuth();
+  const { user, logout } = useAuth();
   const navigation = useNavigation();
   
   const [drawerOpen, setDrawerOpen] = useState(false);
@@ -64,12 +68,14 @@ const UserDashboard = () => {
     })
   ).current;
 
-  useEffect(() => {
-    fetchDashboardData();
-    intervalRef.current = setInterval(fetchDashboardData, 620000);
-    return () => clearInterval(intervalRef.current);
-  }, []);
+  // Update this useEffect (around line 78):
+useEffect(() => {
+  fetchDashboardData();
+  intervalRef.current = setInterval(fetchDashboardData, 620000);
+  return () => clearInterval(intervalRef.current);
+}, []);
 
+// ✅ This is now correct since userAPI is imported directly
   useEffect(() => setSelectedProject(''), [targetType]);
 
   // Fetch subqueries when service is selected
@@ -86,10 +92,10 @@ const UserDashboard = () => {
     setLoading(true);
     try {
       const [servicesRes, webRes, appRes, recentRes] = await Promise.allSettled([
-        userApi.getServices(),
-        userApi.getProjects('web'),
-        userApi.getProjects('app'),
-        userApi.getRecentRequests(),
+        userAPI.getServices(),
+        userAPI.getProjects('web'),
+        userAPI.getProjects('app'),
+        userAPI.getRecentRequests(),
       ]);
 
       setServices(servicesRes.status === 'fulfilled' ? servicesRes.value.data.services || [] : []);
@@ -108,18 +114,19 @@ const UserDashboard = () => {
       setLoading(false);
       setRefreshing(false);
     }
-  };
+  };  
 
   const onRefresh = () => {
-    setRefreshing(true);
-    fetchDashboardData();
-  };
+  if (!userAPI) return; // Add safety check
+  setRefreshing(true);
+  fetchDashboardData();
+};
 
   const fetchSubQueries = async (queryId) => {
     setLoadingSubQueries(true);
     try {
       console.log('Fetching subqueries for query:', queryId);
-      const res = await userApi.getSubQueries(queryId);
+      const res = await userAPI.getSubQueries(queryId);
       console.log('Subqueries API response:', res.data);
       
       if (res.data.success) {
@@ -167,7 +174,7 @@ const UserDashboard = () => {
       
       console.log('Submitting payload:', payload);
       
-      const res = await userApi.submitChangeRequest(payload);
+      const res = await userAPI.submitChangeRequest(payload);
 
       if (!res.data.success) {
         const messages = res.data.errors ? Object.values(res.data.errors).flat().join('\n') : res.data.message;
@@ -301,14 +308,16 @@ const UserDashboard = () => {
     </View>
   );
 
-  if (loading) {
-    return (
-      <View style={styles.loader}>
-        <ActivityIndicator size="large" color="#2C3E50" />
-        <Text style={styles.loadingText}>Loading dashboard...</Text>
-      </View>
-    );
-  }
+ if (loading || !userAPI) {
+  return (
+    <View style={styles.loader}>
+      <ActivityIndicator size="large" color="#2C3E50" />
+      <Text style={styles.loadingText}>
+        {!userAPI ? 'Initializing dashboard...' : 'Loading dashboard...'}
+      </Text>
+    </View>
+  );
+}
 
   return (
     <View style={styles.container}>
@@ -632,6 +641,7 @@ const UserDashboard = () => {
               )}
             </LinearGradient>
           </Animatable.View>
+          <Footer />
         </ScrollView>
       </Animated.View>
     </View>

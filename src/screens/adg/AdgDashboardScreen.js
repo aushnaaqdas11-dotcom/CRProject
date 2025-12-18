@@ -16,8 +16,8 @@ import { useNavigation } from '@react-navigation/native';
 import Icon from 'react-native-vector-icons/FontAwesome';
 import LinearGradient from 'react-native-linear-gradient';
 import * as Animatable from 'react-native-animatable';
-import api from "../services/apiService";
-import { useAuth } from '../hooks/redux'; // ADD THIS IMPORT
+import api from "../../services/apiService";
+import { useAuth } from '../../hooks/redux'; // ADD THIS IMPORT
 
 
 const { width, height } = Dimensions.get("window");
@@ -76,15 +76,19 @@ const AdgDashboardScreen = () => {
         style: 'destructive',
         onPress: async () => {
           try {
-            // ACTUALLY CALL THE LOGOUT FUNCTION
+            console.log('AdgDashboard: Starting logout...');
+            
+            // Just dispatch logout - NO NAVIGATION
             await logout();
             
-            // Navigate to Login screen
-            navigation.navigate('Login');
+            console.log('AdgDashboard: Logout dispatched successfully');
+            
+            // The navigation will happen automatically via Redux state change
+            // DO NOT ADD navigation.navigate() here!
+            
           } catch (error) {
-            console.error('Logout error:', error);
-            // Even if there's an error, still navigate to Login
-            navigation.navigate('Login');
+            console.error('AdgDashboard: Logout error:', error);
+            // Even if there's an error, don't navigate manually
           }
         }
       }

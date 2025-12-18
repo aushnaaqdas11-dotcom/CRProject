@@ -1,4 +1,4 @@
-// screens/ProjectManagement.js
+// screens/admin/ProjectManagement.js
 import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
@@ -19,6 +19,9 @@ import LinearGradient from 'react-native-linear-gradient';
 import Icon from 'react-native-vector-icons/FontAwesome';
 import { adminAPI } from '../../services/apiService';
 import { useAuth } from '../../hooks/redux';
+import AsyncStorage from '@react-native-async-storage/async-storage'; // Add this
+import Footer from '../../components/Footer'; // Add this import
+
 
 const { width } = Dimensions.get('window');
 
@@ -58,19 +61,46 @@ const ProjectManagement = ({ navigation }) => {
 
   const { user, token } = useAuth();
 
+  // ✅ PRODUCTION-READY AUTH INITIALIZATION
   useEffect(() => {
-    if (token) {
-      adminAPI.setAuthToken(token);
-    }
-  }, [token]);
+    const initializeAuth = async () => {
+      try {
+        console.log('🔄 ProjectManagement: Initializing auth...');
+        
+        // Method 1: Use token from useAuth (preferred)
+        if (token) {
+          // Set token in API service
+          await adminAPI.setAuthToken(token);
+          console.log('✅ ProjectManagement: Token set from useAuth');
+        } else {
+          // Method 2: Fallback to AsyncStorage
+          const storedToken = await AsyncStorage.getItem('api_token');
+          if (storedToken) {
+            await adminAPI.setAuthToken(storedToken);
+            console.log('✅ ProjectManagement: Token set from AsyncStorage');
+          } else {
+            console.log('⚠️ ProjectManagement: No token available');
+            Alert.alert('Session Expired', 'Please login again.', [
+              { text: 'OK', onPress: () => navigation.replace('Login') },
+            ]);
+            return;
+          }
+        }
+        
+        // Load projects after auth is initialized
+        loadProjects();
+      } catch (error) {
+        console.error('❌ ProjectManagement: Auth initialization failed:', error);
+        Alert.alert('Error', 'Authentication failed. Please login again.', [
+          { text: 'OK', onPress: () => navigation.replace('Login') },
+        ]);
+      }
+    };
+
+    initializeAuth();
+  }, [token, navigation]);
 
   const loadProjects = async (page = 1, search = '') => {
-    if (!token) {
-      Alert.alert('Not Authenticated', 'Please login again.');
-      navigation.replace('Login');
-      return;
-    }
-
     try {
       setLoading(true);
       const params = {
@@ -79,6 +109,7 @@ const ProjectManagement = ({ navigation }) => {
         search: search.trim(),
       };
 
+      console.log('📡 Loading projects with params:', params);
       const response = await adminAPI.getProjects(params);
 
       if (response.data.success) {
@@ -86,19 +117,26 @@ const ProjectManagement = ({ navigation }) => {
         setProjects(data.projects || []);
         setPagination(data.pagination || {});
         setStats(data.stats || { total_projects: 0, web_projects: 0, app_projects: 0 });
+        console.log(`✅ Loaded ${data.projects?.length || 0} projects`);
       } else {
         Alert.alert('Error', response.data.message || 'Failed to load projects');
       }
     } catch (error) {
+      console.error('❌ loadProjects error:', error);
       const status = error.response?.status;
+      
       if (status === 401) {
         Alert.alert('Session Expired', 'Please login again.', [
           { text: 'OK', onPress: () => navigation.replace('Login') },
         ]);
       } else if (status === 403) {
-        Alert.alert('Access Denied', 'You do not have permission.');
+        Alert.alert('Access Denied', 'You do not have permission to view projects.');
+      } else if (status === 404) {
+        Alert.alert('Not Found', 'Projects endpoint not found.');
+      } else if (error.message === 'Network Error') {
+        Alert.alert('Network Error', 'Please check your internet connection.');
       } else {
-        Alert.alert('Error', 'Failed to load projects. Try again.');
+        Alert.alert('Error', 'Failed to load projects. Please try again.');
       }
     } finally {
       setLoading(false);
@@ -437,6 +475,7 @@ const ProjectManagement = ({ navigation }) => {
               </View>
             </View>
           </Modal>
+        <Footer />
         </>
       )}
     </SafeAreaView>
