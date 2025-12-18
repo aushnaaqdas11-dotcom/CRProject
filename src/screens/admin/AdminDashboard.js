@@ -117,7 +117,7 @@ const loadDashboard = async () => {
     title: 'Assign to Users',
     description: 'Assign projects to multiple users',
     route: 'AssignProjectsToUsers', // New route
-    icon: 'user-check',
+    icon: 'tasks',
     color: '#9C27B0',
     gradient: ['#9C27B0', '#E91E63']
   }
