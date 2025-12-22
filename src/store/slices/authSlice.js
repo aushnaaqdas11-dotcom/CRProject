@@ -2,184 +2,172 @@ import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import apiService from '../../services/apiService';
 
-// Async thunks for API calls
+// ===============================================
+// ASYNC THUNKS - FIXED VERSION
+// ===============================================
+
 export const loginUser = createAsyncThunk(
   'auth/login',
   async ({ login, password, captcha, captchaKey }, { rejectWithValue }) => {
     try {
-      console.log('🔐 authSlice: Starting login with CAPTCHA...');
-      console.log('🔐 authSlice: Parameters:', { 
-        login, 
-        passwordLength: password?.length,
-        captcha, 
-        captchaKey 
-      });
+      console.log('🔐 authSlice: Attempting login...');
       
+      // Make login API call
       const response = await apiService.auth.login(login, password, captcha, captchaKey);
       
-      console.log('🔐 authSlice: API Response received');
-      console.log('🔐 authSlice: Response data:', response.data);
-      
-      if (response.data && response.data.success) {
+      if (response.data?.success) {
         const { token, user } = response.data;
         
-        console.log('🔐 authSlice: Login successful!');
-        console.log('🔐 authSlice: Token received:', token ? `length: ${token.length}` : 'NULL');
-        console.log('🔐 authSlice: User received:', user);
+        console.log('✅ Login API successful');
         
-        // Save to AsyncStorage
-        try {
-          await AsyncStorage.setItem('api_token', token);
-          await AsyncStorage.setItem('user', JSON.stringify(user));
-          await AsyncStorage.setItem('token', token);
-          console.log('✅ authSlice: Saved to AsyncStorage successfully');
-        } catch (storageError) {
-          console.error('❌ authSlice: Error saving to AsyncStorage:', storageError);
-        }
+        // ✅ FIXED: Use apiService to save token (it handles AsyncStorage AND headers)
+        await apiService.setAuthToken(token);
         
-        // Update apiService
-        try {
-          await apiService.setAuthToken(token);
-          console.log('✅ authSlice: Updated apiService with token');
-        } catch (apiServiceError) {
-          console.error('❌ authSlice: Error updating apiService:', apiServiceError);
-        }
+        // ✅ FIXED: Save user data separately
+        await AsyncStorage.setItem('user_data', JSON.stringify(user));
         
-        // Verify storage
-        try {
-          const storedToken = await AsyncStorage.getItem('api_token');
-          console.log('🔐 authSlice: Verification - Stored token:', storedToken ? `Exists (${storedToken.length} chars)` : 'NOT STORED!');
-        } catch (verifyError) {
-          console.error('❌ authSlice: Error verifying storage:', verifyError);
-        }
-        
+        console.log('✅ Token & user data saved');
         return { token, user };
       } else {
-        console.log('🔐 authSlice: Login failed - no success in response');
+        // Handle API success: false
         return rejectWithValue({
           message: response.data?.message || 'Login failed',
-          errors: response.data?.errors || {},
+          errors: response.data?.errors || {}
         });
       }
     } catch (error) {
-      console.error('🔐 authSlice: Login error caught:');
-      console.error('🔐 authSlice: Error object:', error);
-      console.error('🔐 authSlice: Error response:', error.response?.data);
+      console.error('❌ Login failed:', error);
       
-      let errorMessage = 'Network error. Please try again.';
-      let errors = {};
+      // Extract error details
+      const errorMessage = error.response?.data?.message || error.message || 'Network error';
+      const errors = error.response?.data?.errors || {};
       
-      if (error.response?.data) {
-        errorMessage = error.response.data.message || errorMessage;
-        errors = error.response.data.errors || {};
-      } else if (error.message) {
-        errorMessage = error.message;
-      }
-      
-      return rejectWithValue({
-        message: errorMessage,
-        errors: errors,
+      return rejectWithValue({ 
+        message: errorMessage, 
+        errors,
+        status: error.response?.status 
       });
     }
   }
 );
 
-// In authSlice.js - logoutUser thunk
+// ✅ FIXED: Logout with proper error handling
 export const logoutUser = createAsyncThunk(
   'auth/logout',
   async (_, { rejectWithValue }) => {
+    console.log('🚪 authSlice: Starting logout...');
+    
     try {
-      // Clear tokens from storage
-      await AsyncStorage.clear();
-      await apiService.setAuthToken(null);
-      
-      // Return success - NO NAVIGATION
-      return { success: true };
+      // Try to call logout API (but don't fail if it doesn't work)
+      try {
+        await apiService.auth.logout();
+        console.log('✅ Logout API call completed');
+      } catch (apiError) {
+        console.log('⚠️ Logout API call failed (expected if token expired):', apiError.message);
+        // Continue with local cleanup even if API fails
+      }
     } catch (error) {
-      // Even on error, clear tokens
-      await AsyncStorage.clear();
-      await apiService.setAuthToken(null);
+      console.error('❌ Unexpected error during logout:', error);
+    } finally {
+      // ✅ CRITICAL FIX: ALWAYS clear local data
+      try {
+        // Clear AsyncStorage
+        await AsyncStorage.multiRemove(['api_token', 'user_data']);
+        console.log('✅ AsyncStorage cleared');
+        
+        // Clear apiService token
+        if (apiService.setAuthToken) {
+          await apiService.setAuthToken(null);
+          console.log('✅ apiService token cleared');
+        }
+      } catch (storageError) {
+        console.error('❌ Error clearing storage:', storageError);
+      }
       
-      return rejectWithValue({ message: 'Logout error' });
+      return { success: true };
     }
   }
 );
 
+// ✅ FIXED: Load user from storage
 export const loadUserFromStorage = createAsyncThunk(
   'auth/loadUser',
   async (_, { rejectWithValue }) => {
     try {
       console.log('🔐 authSlice: Loading user from storage...');
       
-      // Check for token in both possible locations
-      let storedToken = await AsyncStorage.getItem('api_token');
-      if (!storedToken) {
-        storedToken = await AsyncStorage.getItem('token');
-        console.log('🔐 authSlice: Fallback to token key');
-      }
+      // Get token and user data from storage
+      const token = await AsyncStorage.getItem('api_token');
+      const userData = await AsyncStorage.getItem('user_data');
       
-      const userData = await AsyncStorage.getItem('user');
-      
-      console.log('🔐 authSlice: Storage check - api_token exists:', !!storedToken);
-      console.log('🔐 authSlice: Storage check - user exists:', !!userData);
-      
-      if (storedToken && userData) {
-        console.log('✅ authSlice: Found user in storage');
-        console.log(`✅ authSlice: Token length: ${storedToken.length}`);
+      if (token && userData) {
+        const user = JSON.parse(userData);
         
-        // Ensure api_token is set (in case we loaded from 'token')
-        if (!await AsyncStorage.getItem('api_token')) {
-          await AsyncStorage.setItem('api_token', storedToken);
+        console.log('✅ Found stored credentials');
+        
+        // ✅ FIXED: Always set token in apiService when loading
+        if (apiService.setAuthToken) {
+          await apiService.setAuthToken(token);
+          console.log('✅ Token set in apiService');
         }
         
-        // Initialize apiService with token
-        await apiService.setAuthToken(storedToken);
-        
-        return { token: storedToken, user: JSON.parse(userData) };
+        return { token, user };
       }
       
-      console.log('⚠️ authSlice: No user found in storage');
+      console.log('⚠️ No stored credentials found');
       return { token: null, user: null };
     } catch (error) {
-      console.error('❌ authSlice: Error loading user:', error);
-      return rejectWithValue({
-        message: 'Error loading user from storage',
-      });
+      console.error('❌ Failed to load from storage:', error);
+      
+      // Even on error, return null values
+      return { token: null, user: null };
     }
   }
 );
+
+// ===============================================
+// SLICE - FIXED VERSION
+// ===============================================
 
 const authSlice = createSlice({
   name: 'auth',
   initialState: {
     user: null,
     token: null,
-    loading: true,
+    loading: true,    // true initially so splash shows
     error: null,
+    initialized: false, // ✅ ADDED: Track if auth is initialized
   },
   reducers: {
     clearError: (state) => {
       state.error = null;
     },
-    setLoading: (state, action) => {
-      state.loading = action.payload;
-    },
-    // ✅ NEW: Manually set auth state (for debugging)
-    setAuthState: (state, action) => {
-      state.user = action.payload.user;
-      state.token = action.payload.token;
-    },
-    // ✅ NEW: Quick logout without API call
+    
     quickLogout: (state) => {
       state.user = null;
       state.token = null;
       state.error = null;
       state.loading = false;
+      state.initialized = true;
+    },
+    
+    // ✅ ADDED: Manually set auth state (useful for debugging)
+    setAuthState: (state, action) => {
+      const { token, user } = action.payload;
+      state.token = token;
+      state.user = user;
+      state.initialized = true;
+    },
+    
+    // ✅ ADDED: Mark as initialized (for SplashScreen)
+    markAsInitialized: (state) => {
+      state.initialized = true;
+      state.loading = false;
     },
   },
   extraReducers: (builder) => {
     builder
-      // Login cases
+      // Login
       .addCase(loginUser.pending, (state) => {
         state.loading = true;
         state.error = null;
@@ -189,14 +177,15 @@ const authSlice = createSlice({
         state.user = action.payload.user;
         state.token = action.payload.token;
         state.error = null;
-        console.log('✅ authSlice: Redux state updated with user:', action.payload.user?.email);
+        state.initialized = true;
       })
       .addCase(loginUser.rejected, (state, action) => {
         state.loading = false;
         state.error = action.payload;
-        console.log('❌ authSlice: Login rejected:', action.payload?.message);
+        state.initialized = true;
       })
-      // Logout cases
+
+      // Logout
       .addCase(logoutUser.pending, (state) => {
         state.loading = true;
       })
@@ -205,17 +194,18 @@ const authSlice = createSlice({
         state.token = null;
         state.error = null;
         state.loading = false;
-        console.log('✅ authSlice: Logout successful - Redux state cleared');
+        state.initialized = true;
       })
-      .addCase(logoutUser.rejected, (state, action) => {
-        // Even if API fails, clear local state
+      .addCase(logoutUser.rejected, (state) => {
+        // Even if logout fails, still clear local state
         state.user = null;
         state.token = null;
+        state.error = null;
         state.loading = false;
-        state.error = action.payload;
-        console.log('⚠️ authSlice: Logout API failed but state cleared');
+        state.initialized = true;
       })
-      // Load user cases
+
+      // Load from storage
       .addCase(loadUserFromStorage.pending, (state) => {
         state.loading = true;
       })
@@ -223,14 +213,18 @@ const authSlice = createSlice({
         state.loading = false;
         state.user = action.payload.user;
         state.token = action.payload.token;
-        console.log('✅ authSlice: User loaded from storage:', action.payload.user ? 'YES' : 'NO');
+        state.initialized = true;
+        state.error = null;
       })
-      .addCase(loadUserFromStorage.rejected, (state, action) => {
+      .addCase(loadUserFromStorage.rejected, (state) => {
         state.loading = false;
-        state.error = action.payload;
+        state.user = null;
+        state.token = null;
+        state.initialized = true;
+        state.error = null;
       });
   },
 });
 
-export const { clearError, setLoading, setAuthState, quickLogout } = authSlice.actions;
+export const { clearError, quickLogout, setAuthState, markAsInitialized } = authSlice.actions;
 export default authSlice.reducer;

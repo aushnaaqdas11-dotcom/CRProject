@@ -1,7 +1,7 @@
 import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-const BASE_URL = 'http://10.50.206.179:8000/api';
+const BASE_URL = 'http://10.50.206.55:8000/api';
 
 // Create axios instance
 const apiService = axios.create({
@@ -13,144 +13,127 @@ const apiService = axios.create({
   timeout: 120000,
 });
 
-// Global token variable
+// Global token variable - SIMPLIFIED
 let authToken = null;
-let isTokenInitialized = false;
-let tokenPromise = null;
-
-// Token refresh state management
-let isRefreshing = false;
-let failedQueue = [];
-
-// Process failed queue
-const processQueue = (error, token = null) => {
-  failedQueue.forEach(prom => {
-    if (error) {
-      prom.reject(error);
-    } else {
-      prom.resolve(token);
-    }
-  });
-  failedQueue = [];
-};
+let tokenInitialized = false;
 
 // ===============================================
-// TOKEN MANAGEMENT - FIXED VERSION
+// FIXED TOKEN MANAGEMENT - SIMPLIFIED
 // ===============================================
 
-// Single global function to manage token
+// ✅ FIXED: Simple token setter without overcomplication
 export const setAuthTokenGlobal = async (token) => {
-  console.log('🔄 setAuthTokenGlobal called:', token ? `token length: ${token.length}` : 'NULL');
+  console.log('🔄 setAuthTokenGlobal called:', token ? 'Token set' : 'Token cleared');
   
   authToken = token;
   
   if (token) {
     // Remove any existing Bearer prefix
     const cleanToken = token.startsWith('Bearer ') ? token.substring(7) : token;
+    
+    // Set in axios headers
     apiService.defaults.headers.common['Authorization'] = `Bearer ${cleanToken}`;
     
+    // Save to storage
     try {
       await AsyncStorage.setItem('api_token', cleanToken);
-      console.log(`✅ Token set in headers and storage: ${cleanToken.substring(0, 30)}...`);
+      console.log(`✅ Token saved to storage`);
     } catch (error) {
-      console.error('❌ Error saving token to storage:', error);
+      console.error('❌ Error saving token:', error);
     }
   } else {
+    // Clear token
     delete apiService.defaults.headers.common['Authorization'];
+    
+    // Remove from storage
     try {
-      await AsyncStorage.multiRemove(['api_token', 'refresh_token', 'user_data']);
+      await AsyncStorage.multiRemove(['api_token', 'user_data']);
       console.log('✅ All tokens removed from storage');
     } catch (error) {
-      console.error('❌ Error removing tokens from storage:', error);
+      console.error('❌ Error removing tokens:', error);
     }
     authToken = null;
   }
   
-  isTokenInitialized = true;
-  tokenPromise = null;
+  tokenInitialized = true;
+  return true;
 };
 
-// Get token with promise caching
+// ✅ FIXED: Simple token getter
 const getToken = async () => {
-  if (authToken && isTokenInitialized) {
+  // If we already have token in memory, use it
+  if (authToken) {
     return authToken;
   }
   
-  if (tokenPromise) {
-    console.log('⏳ Token fetch already in progress, waiting...');
-    return await tokenPromise;
-  }
-  
-  tokenPromise = (async () => {
+  // If not initialized, get from storage
+  if (!tokenInitialized) {
     try {
-      console.log('🔍 Fetching token from AsyncStorage...');
-      const token = await AsyncStorage.getItem('api_token');
+      console.log('🔍 Initializing token from storage...');
+      const storedToken = await AsyncStorage.getItem('api_token');
       
-      if (token) {
-        authToken = token;
-        apiService.defaults.headers.common['Authorization'] = `Bearer ${token}`;
-        isTokenInitialized = true;
-        console.log(`✅ Token loaded from storage: ${token.substring(0, 30)}...`);
-        return token;
+      if (storedToken) {
+        authToken = storedToken;
+        apiService.defaults.headers.common['Authorization'] = `Bearer ${storedToken}`;
+        console.log('✅ Token initialized from storage');
+      } else {
+        console.log('⚠️ No token found in storage');
       }
       
-      console.log('⚠️ No token found in storage');
-      isTokenInitialized = true;
-      return null;
+      tokenInitialized = true;
     } catch (error) {
-      console.error('❌ Error fetching token:', error);
-      isTokenInitialized = true;
-      return null;
-    } finally {
-      tokenPromise = null;
+      console.error('❌ Error initializing token:', error);
+      tokenInitialized = true;
     }
-  })();
+  }
   
-  return await tokenPromise;
+  return authToken;
+};
+
+// ✅ FIXED: Simple token check for API calls
+const ensureTokenForRequest = async (config) => {
+  // Skip token for auth endpoints
+  const isAuthEndpoint = config.url.includes('/login') || 
+                        config.url.includes('/captcha') || 
+                        config.url.includes('/test/') ||
+                        config.url.includes('/logout'); // ✅ ADDED: logout endpoint
+  
+  if (isAuthEndpoint) {
+    console.log('✅ Auth endpoint, skipping token');
+    delete config.headers.Authorization;
+    return config;
+  }
+  
+  // For other endpoints, ensure we have a token
+  try {
+    const token = await getToken();
+    
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`;
+      console.log(`✅ Token attached: ${token.substring(0, 15)}...`);
+    } else {
+      console.log('⚠️ No token available');
+      // Don't add Authorization header if no token
+    }
+  } catch (error) {
+    console.error('❌ Error getting token for request:', error);
+  }
+  
+  return config;
 };
 
 // ===============================================
-// REQUEST INTERCEPTOR - FIXED VERSION
+// REQUEST INTERCEPTOR - SIMPLIFIED
 // ===============================================
 
 apiService.interceptors.request.use(
   async (config) => {
-    console.log(`🚀 [REQUEST] ${config.method?.toUpperCase()} ${config.url}`);
+    console.log(`🚀 [${config.method?.toUpperCase()}] ${config.url}`);
     
-    const isAuthEndpoint = config.url.includes('/auth/login') || 
-                          config.url.includes('/auth/captcha') || 
-                          config.url.includes('/auth/logout') ||
-                          config.url.includes('/test/');
+    // Add token to request if needed
+    const updatedConfig = await ensureTokenForRequest(config);
     
-    if (!isAuthEndpoint) {
-      try {
-        // Wait for token initialization if not done
-        if (!isTokenInitialized) {
-          console.log('⏳ Waiting for token initialization...');
-          await getToken();
-        }
-        
-        // Get fresh token
-        const token = await getToken();
-        
-        if (token) {
-          config.headers.Authorization = `Bearer ${token}`;
-          console.log(`✅ Token attached to request: ${token.substring(0, 20)}...`);
-        } else {
-          console.log('⚠️ No token available for request');
-          // Don't add Authorization header if no token
-        }
-      } catch (error) {
-        console.error('❌ Error in token interceptor:', error);
-        // Don't throw, just proceed without token
-      }
-    } else {
-      console.log('✅ Auth endpoint, skipping token check');
-      // Ensure no Authorization header for auth endpoints
-      delete config.headers.Authorization;
-    }
-    
-    return config;
+    return updatedConfig;
   },
   (error) => {
     console.error('❌ Request interceptor failed:', error);
@@ -159,178 +142,73 @@ apiService.interceptors.request.use(
 );
 
 // ===============================================
-// ENHANCED RESPONSE INTERCEPTOR WITH TOKEN REFRESH - UPDATED
+// RESPONSE INTERCEPTOR - FIXED FOR LOGOUT
 // ===============================================
 
+// In apiService.js - Update the response interceptor:
 apiService.interceptors.response.use(
   (response) => {
-    console.log(`✅ [RESPONSE ${response.status}] ${response.config.url}`);
+    console.log(`✅ [${response.status}] ${response.config.url}`);
     return response;
   },
   async (error) => {
-    const originalRequest = error.config;
-    const url = error.config?.url;
     const status = error.response?.status;
-    const data = error.response?.data;
-    
-    // ✅ SILENTLY IGNORE 401 for logout endpoint
-    if (url && url.includes('/auth/logout') && status === 401) {
-      console.log('🔐 Logout endpoint: Token already invalid (expected)');
-      return Promise.reject(error);
+    const url = error.config?.url;
+
+    // ✅ FIX: Don't log 401 errors for logout (they're expected)
+    if (url?.includes('/logout') && status === 401) {
+      console.log('🔓 Logout completed (token invalidated)');
+      // Re-throw with a cleaner message
+      return Promise.reject({ 
+        message: 'Logout completed', 
+        isLogout: true 
+      });
     }
-    
-    console.error('❌ [API ERROR DETAILS] ======================');
-    console.error('URL:', url);
-    console.error('Status:', status);
-    console.error('Message:', data?.message || error.message);
-    console.error('=====================================');
-    
-    // ========== HANDLE 401 UNAUTHORIZED (TOKEN EXPIRED) ==========
+
+    console.error('❌ API Error:', status, url, error.response?.data || error.message);
+
+    // If 401 and not on login/logout, clear token and force re-login
     if (status === 401) {
-      console.log('🔒 401 Unauthorized - Token expired or invalid');
-      
-      // Don't retry auth endpoints
-      if (url && (url.includes('/auth/login') || url.includes('/auth/logout'))) {
-        return Promise.reject(error);
-      }
-      
-      // If already refreshing, add to queue
-      if (isRefreshing) {
-        return new Promise((resolve, reject) => {
-          failedQueue.push({ resolve, reject });
-        })
-          .then(token => {
-            originalRequest.headers.Authorization = `Bearer ${token}`;
-            return apiService(originalRequest);
-          })
-          .catch(err => Promise.reject(err));
-      }
-      
-      originalRequest._retry = true;
-      isRefreshing = true;
-      
-      try {
-        console.log('🔄 Attempting token refresh...');
-        
-        // ✅ FIXED: Get current token for refresh
-        const currentToken = await getToken();
-        
-        if (!currentToken) {
-          console.log('❌ No token available for refresh');
-          throw new Error('No token available');
-        }
-        
-        // ✅ FIXED: Call refresh token endpoint with current token
-        // Note: This requires the backend to have a /auth/refresh-token endpoint
-        const refreshResponse = await apiService.post('/auth/refresh-token', {}, {
-          headers: {
-            'Authorization': `Bearer ${currentToken}`,
-            'Content-Type': 'application/json',
-            'Accept': 'application/json',
-          }
-        });
-        
-        console.log('📡 Refresh response:', refreshResponse.data);
-        
-        if (refreshResponse.data.success) {
-          const newToken = refreshResponse.data.data?.token;
-          
-          if (newToken) {
-            console.log('✅ Token refreshed successfully');
-            
-            // Save new token
-            await setAuthTokenGlobal(newToken);
-            
-            // Update original request with new token
-            originalRequest.headers.Authorization = `Bearer ${newToken}`;
-            
-            // Process queued requests
-            processQueue(null, newToken);
-            isRefreshing = false;
-            
-            // Retry original request
-            return apiService(originalRequest);
-          }
-        } else {
-          throw new Error(refreshResponse.data.message || 'Token refresh failed');
-        }
-      } catch (refreshError) {
-        console.log('❌ Token refresh failed:', refreshError.message);
-        
-        // If refresh endpoint doesn't exist (404), handle gracefully
-        if (refreshError.response?.status === 404) {
-          console.log('🔄 Refresh endpoint not found, clearing token...');
-        }
-        
-        // Clear all tokens
-        await setAuthTokenGlobal(null);
-        
-        // Process queue with error
-        processQueue(refreshError, null);
-        isRefreshing = false;
-        
-        // Create a global event for session expiration
-        if (typeof window !== 'undefined') {
-          const event = new CustomEvent('session-expired');
-          window.dispatchEvent(event);
-        }
-        
-        return Promise.reject(refreshError);
-      }
+      console.log('🔒 Token expired/invalid for non-logout endpoint');
+      // Clear tokens and force re-login for other endpoints
+      await setAuthTokenGlobal(null);
     }
-    
-    // ========== HANDLE OTHER ERRORS ==========
-    
-    // Handle 419 CSRF Token Mismatch (Laravel specific)
-    if (status === 419) {
-      console.log('🛡️ 419 CSRF Token Mismatch');
-    }
-    
-    // Handle 429 Too Many Requests
-    if (status === 429) {
-      console.log('⏱️ 429 Too Many Requests - Rate limited');
-    }
-    
-    // Handle 403 Forbidden
-    if (status === 403) {
-      console.log('🚫 403 Forbidden - Insufficient permissions');
-    }
-    
-    // Handle 404 Not Found
-    if (status === 404) {
-      console.log('🔍 404 Not Found - Endpoint does not exist');
-    }
-    
-    // Handle 500 Server Error
-    if (status >= 500) {
-      console.log('💥 Server Error - Backend issue');
-    }
-    
+
     return Promise.reject(error);
   }
 );
+
 // ===============================================
-// REST OF YOUR API FUNCTIONS
+// API ENDPOINTS - WITH FIXED LOGOUT
 // ===============================================
 
 export const authAPI = {
   // Get CAPTCHA
-  getCaptcha: () => apiService.get('/auth/captcha'),
+  getCaptcha: () => apiService.post('/captcha'),
   
-  // ✅ CORRECT: Login with CAPTCHA (4 parameters)
+  // Login with CAPTCHA
   login: (login, password, captcha, captchaKey) => 
-    apiService.post('/auth/login', { login, password, captcha, captcha_key: captchaKey }),
+    apiService.post('/login', { login, password, captcha, captcha_key: captchaKey }),
   
-  // Logout
-  logout: () => apiService.post('/auth/logout'),
+  // ✅ FIXED: Logout with proper error handling
+  logout: async () => {
+    try {
+      // Try to call logout API
+      const response = await apiService.post('/logout');
+      console.log('✅ Logout API succeeded');
+      return response;
+    } catch (error) {
+      // If logout API fails, still return success for local cleanup
+      console.log('⚠️ Logout API failed, but continuing with local cleanup');
+      return { data: { success: true, message: 'Local cleanup completed' } };
+    }
+  },
   
   // Get current user
   getUser: () => apiService.get('/auth/user'),
-  
-  // Refresh token
-  refreshToken: () => apiService.post('/auth/refresh-token'),
 };
 
+// ... rest of your API endpoints remain the same ...
 export const userAPI = {
   getDashboard: () => apiService.get('/user/dashboard'),
   getHistory: () => apiService.get('/user/history'),
@@ -340,10 +218,6 @@ export const userAPI = {
   submitChangeRequest: (data) => apiService.post('/user/change-request', data),
   getSubQueries: (queryId) => apiService.get(`/user/sub-queries/${queryId}`),
 };
-
-// ===============================================
-// ASSIGNER API
-// ===============================================
 
 export const assignerAPI = {
   getRequests: (params = {}) => apiService.get('/assigner/requests', { params }),
@@ -378,10 +252,6 @@ export const assignerAPI = {
   debugUploadIssue: (requestId) => apiService.get(`/assigner/debug-upload-issue/${requestId}`),
 };
 
-// ===============================================
-// RESOLVER API
-// ===============================================
-
 export const resolverAPI = {
   getDashboard: () => apiService.get('/resolver/dashboard'),
   getAssignedRequests: () => apiService.get('/resolver/requests'),
@@ -391,47 +261,28 @@ export const resolverAPI = {
   getProfile: () => apiService.get('/resolver/profile'),
 };
 
-// ===============================================
-// ADMIN API
-// ===============================================
-
 export const adminAPI = {
-  // Add token management methods to adminAPI
-  setAuthToken: setAuthTokenGlobal, // ✅ Add this
-  getCurrentToken: () => authToken, // ✅ Add this
+  setAuthToken: setAuthTokenGlobal,
+  getCurrentToken: () => authToken,
   clearAuthToken: async () => {
     await setAuthTokenGlobal(null);
   },
-  
-  // Dashboard
   getDashboard: () => apiService.get('/admin/dashboard'),
   getUsers: (params = {}) => apiService.get('/admin/users', { params }),
   getUser: (id) => apiService.get(`/admin/users/${id}`),
   createUser: (data) => apiService.post('/admin/users', data),
   updateUser: (id, data) => apiService.put(`/admin/users/${id}`, data),
   deleteUser: (id) => apiService.delete(`/admin/users/${id}`),
-  
-  // Projects Management (CRUD operations)
   getProjects: (params = {}) => apiService.get('/admin/projects', { params }),
   getProject: (id) => apiService.get(`/admin/projects/${id}`),
   createProject: (data) => apiService.post('/admin/projects', data),
   updateProject: (id, data) => apiService.put(`/admin/projects/${id}`, data),
   deleteProject: (id) => apiService.delete(`/admin/projects/${id}`),
-  
-  // Project Statistics
   getProjectStats: () => apiService.get('/admin/projects-stats'),
-  
-  // Search and filtering
   searchProjects: (query) => apiService.get('/admin/projects-search', { params: { q: query } }),
   getProjectsByType: (type) => apiService.get(`/admin/projects-by-type/${type}`),
-  
-  // Bulk operations
   bulkDeleteProjects: (projectIds) => apiService.post('/admin/projects/bulk-delete', { project_ids: projectIds }),
-  
-  // Roles and Permissions
   getRoles: () => apiService.get('/admin/roles'),
-  
-  // Assignment related
   getAssignableUsers: () => apiService.get('/admin/assignable-users'),
   getProjectsForAssignment: () => apiService.get('/admin/projects-for-assignment'),
   assignProjectsToUser: (data) => apiService.post('/admin/assign-projects', data),
@@ -446,45 +297,38 @@ export const adminAPI = {
     apiService.delete(`/admin/projects/${projectId}/users/${userId}`),
 };
 
-// ===============================================
-// ADG API
-// ===============================================
-
 export const adgAPI = {
   getDashboard: () => apiService.get('/adg/dashboard'),
 };
 
-// ===============================================
-// TEST APIs (For Development)
-// ===============================================
+export const deptHeadAPI = {
+  getDashboard: () => apiService.get('/dept-head/dashboard'),
+  getStatistics: () => apiService.get('/dept-head/statistics'),
+  getPendingRequests: (params = {}) => apiService.get('/dept-head/pending-requests', { params }),
+  getRequestHistory: (params = {}) => apiService.get('/dept-head/history', { params }),
+  getRequestDetails: (id) => apiService.get(`/dept-head/requests/${id}`),
+  approveRequest: (id) => apiService.post(`/dept-head/requests/${id}/approve`),
+  rejectRequest: (id, reason) => apiService.post(`/dept-head/requests/${id}/reject`, {
+    rejection_reason: reason
+  }),
+};
 
 export const testAPI = {
-  // Auth test
   testLogin: (role) => apiService.get(`/test/auth/login/${role}`),
   testUsersList: () => apiService.get('/test/auth/users'),
-  
-  // User test
   testUserDashboard: () => apiService.get('/test/user/dashboard'),
   testUserServices: () => apiService.get('/test/user/services'),
   testUserProjects: (type) => apiService.get(`/test/user/projects/${type}`),
-  
-  // Admin test
   testAdminDashboard: () => apiService.get('/test/admin/dashboard'),
   testAdminUsers: () => apiService.get('/test/admin/users'),
-  
-  // Assigner test
   testAssignerRequests: () => apiService.get('/test/assigner/requests'),
   testAssignerDevelopers: () => apiService.get('/test/assigner/developers'),
-  
-  // Resolver test
   testResolverDashboard: () => apiService.get('/test/resolver/dashboard'),
-  
-  // ADG test
   testAdgDashboard: () => apiService.get('/test/adg/dashboard'),
 };
 
 // ===============================================
-// MAIN EXPORT
+// MAIN EXPORT - SIMPLIFIED
 // ===============================================
 
 export default {
@@ -495,61 +339,45 @@ export default {
   // Initialize token from storage
   initializeToken: async () => {
     try {
-      console.log('🚀 Initializing token system...');
-      
-      // Reset initialization state
-      isTokenInitialized = false;
+      console.log('🚀 Initializing token...');
       
       const token = await AsyncStorage.getItem('api_token');
       if (token) {
-        console.log(`✅ Pre-loaded token: ${token.substring(0, 30)}...`);
-        // Use setAuthTokenGlobal to ensure consistency
         await setAuthTokenGlobal(token);
+        console.log('✅ Token initialized');
         return true;
       }
-      console.log('🚀 No stored token found');
-      isTokenInitialized = true;
+      console.log('⚠️ No stored token');
       return false;
     } catch (error) {
       console.error('❌ Error initializing token:', error);
-      isTokenInitialized = true;
       return false;
     }
   },
   
   // Clear all tokens
   clearToken: async () => {
-    console.log('🧹 Clearing all tokens...');
+    console.log('🧹 Clearing tokens...');
     await setAuthTokenGlobal(null);
   },
   
   // Debug functions
   debugHeaders: () => {
-    console.log('🔍 DEBUG: Current headers:', apiService.defaults.headers.common);
-    console.log('🔍 DEBUG: Current token in memory:', authToken);
-    console.log('🔍 DEBUG: Is token initialized:', isTokenInitialized);
+    console.log('🔍 Current Authorization header:', apiService.defaults.headers.common['Authorization']);
+    console.log('🔍 Token in memory:', authToken ? 'Yes' : 'No');
   },
   
   testToken: async () => {
     try {
       console.log('🧪 Testing token...');
       const response = await apiService.get('/user/dashboard');
-      console.log('✅ Token test successful - Status:', response.status);
+      console.log('✅ Token test successful');
       return { success: true, status: response.status };
     } catch (error) {
-      console.error('❌ Token test failed:', error.response?.status, error.response?.data);
+      console.error('❌ Token test failed:', error.response?.status);
       return { success: false, error: error.response?.data || error.message };
     }
   },
-  
-  // ✅ REMOVED DUPLICATE LOGIN FUNCTION HERE (was causing the problem)
-  // ❌ DELETED: login: (login, password, captcha) => apiService.post('/auth/login', { login, password, captcha }),
-  
-  // Logout
-  logout: () => apiService.post('/auth/logout'),
-  
-  // Get CAPTCHA
-  getCaptcha: () => apiService.get('/auth/captcha'),
   
   // API groups
   auth: authAPI,
@@ -559,8 +387,9 @@ export default {
   admin: adminAPI,
   adg: adgAPI,
   test: testAPI,
+  deptHead: deptHeadAPI,
   
-  // Individual user methods (for backward compatibility)
+  // Individual methods
   getUserDashboard: userAPI.getDashboard,
   getUserHistory: userAPI.getHistory,
   getRecentRequests: userAPI.getRecentRequests,

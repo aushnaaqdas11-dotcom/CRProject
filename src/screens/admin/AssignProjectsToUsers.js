@@ -10,14 +10,14 @@ import {
   TouchableOpacity,
   StatusBar,
   Dimensions,
+  Modal,
+  Platform,
 } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
 import Icon from 'react-native-vector-icons/FontAwesome';
 import { Picker } from '@react-native-picker/picker';
-import { MultiSelect } from 'react-native-element-dropdown';
 import api from '../../services/apiService';
-import Footer from '../../components/Footer'; // Add this import
-
+import Footer from '../../components/Footer';
 
 const { width } = Dimensions.get('window');
 
@@ -30,6 +30,232 @@ const statColors = {
   inprogress: '#3B82F6',
   completed: '#10B981',
   accent: '#6a11cb',
+  success: '#10B981',
+  danger: '#EF4444',
+  info: '#3B82F6',
+};
+
+// ✅ Custom Dropdown Component (like in RequestDetailScreen)
+const CustomDropdown = ({
+  label,
+  options,
+  selectedValue,
+  onSelect,
+  placeholder,
+  searchable = false,
+  multiple = false,
+  selectedValues = [],
+  onMultipleSelect = () => {},
+}) => {
+  const [showModal, setShowModal] = useState(false);
+  const [searchText, setSearchText] = useState('');
+
+  const filteredOptions = searchable
+    ? options.filter(option => 
+        option.label.toLowerCase().includes(searchText.toLowerCase()) ||
+        option.value.toLowerCase().includes(searchText.toLowerCase())
+      )
+    : options;
+
+  const selectedOption = options.find(opt => opt.value === selectedValue);
+  const selectedLabel = selectedOption?.label || placeholder;
+
+  // For multi-select display
+  const selectedMultipleLabels = multiple
+    ? options
+        .filter(opt => selectedValues.includes(opt.value))
+        .map(opt => opt.label)
+    : [];
+
+  const renderMultipleSelection = () => {
+    if (selectedMultipleLabels.length === 0) {
+      return <Text style={styles.dropdownTriggerPlaceholder}>{placeholder}</Text>;
+    }
+
+    return (
+      <View style={styles.multipleSelectionContainer}>
+        {selectedMultipleLabels.slice(0, 2).map((label, index) => (
+          <View key={index} style={styles.selectedBadge}>
+            <Text style={styles.selectedBadgeText} numberOfLines={1}>
+              {label.split(' - ')[0]}
+            </Text>
+          </View>
+        ))}
+        {selectedMultipleLabels.length > 2 && (
+          <View style={styles.moreBadge}>
+            <Text style={styles.moreBadgeText}>+{selectedMultipleLabels.length - 2}</Text>
+          </View>
+        )}
+      </View>
+    );
+  };
+
+  return (
+    <View style={styles.dropdownContainer}>
+      <Text style={styles.dropdownLabel}>{label}:</Text>
+
+      <TouchableOpacity
+        style={[
+          styles.dropdownTrigger,
+          !selectedValue && selectedMultipleLabels.length === 0 && styles.dropdownTriggerEmpty,
+        ]}
+        onPress={() => setShowModal(true)}
+      >
+        {multiple ? (
+          renderMultipleSelection()
+        ) : (
+          <Text style={[
+            styles.dropdownTriggerText,
+            !selectedValue && styles.dropdownTriggerPlaceholder,
+          ]}>
+            {selectedLabel}
+          </Text>
+        )}
+        <Icon
+          name={showModal ? 'chevron-up' : 'chevron-down'}
+          size={16}
+          color={statColors.total}
+        />
+      </TouchableOpacity>
+
+      {/* Modal for dropdown options */}
+      <Modal
+        visible={showModal}
+        transparent={true}
+        animationType="slide"
+        onRequestClose={() => setShowModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>{label}</Text>
+              <TouchableOpacity
+                onPress={() => setShowModal(false)}
+                style={styles.modalCloseButton}
+              >
+                <Icon name="times" size={20} color={statColors.total} />
+              </TouchableOpacity>
+            </View>
+
+            {searchable && (
+              <View style={styles.searchContainer}>
+                <Icon name="search" size={16} color="#9CA3AF" style={styles.searchIcon} />
+                <TextInput
+                  style={styles.searchInput}
+                  placeholder="Search..."
+                  placeholderTextColor="#9CA3AF"
+                  value={searchText}
+                  onChangeText={setSearchText}
+                />
+              </View>
+            )}
+
+            <ScrollView style={styles.optionsList}>
+              {filteredOptions.length === 0 ? (
+                <View style={styles.emptyState}>
+                  <Icon name="search" size={30} color="#D1D5DB" />
+                  <Text style={styles.emptyStateText}>No results found</Text>
+                </View>
+              ) : (
+                filteredOptions.map((option, index) => (
+                  <TouchableOpacity
+                    key={option.value}
+                    style={[
+                      styles.optionItem,
+                      (multiple ? selectedValues.includes(option.value) : selectedValue === option.value) && 
+                        styles.optionItemSelected,
+                      index === filteredOptions.length - 1 && styles.lastOptionItem,
+                    ]}
+                    onPress={() => {
+                      if (multiple) {
+                        const newValues = selectedValues.includes(option.value)
+                          ? selectedValues.filter(v => v !== option.value)
+                          : [...selectedValues, option.value];
+                        onMultipleSelect(newValues);
+                      } else {
+                        onSelect(option.value);
+                        setShowModal(false);
+                      }
+                    }}
+                  >
+                    <View style={styles.optionContent}>
+                      <View style={[
+                        styles.optionIcon,
+                        (multiple ? selectedValues.includes(option.value) : selectedValue === option.value) && 
+                          styles.optionIconSelected,
+                      ]}>
+                        {multiple ? (
+                          selectedValues.includes(option.value) ? (
+                            <Icon name="check-square" size={16} color="#fff" />
+                          ) : (
+                            <Icon name="square-o" size={16} color="#9CA3AF" />
+                          )
+                        ) : selectedValue === option.value ? (
+                          <Icon name="check-circle" size={16} color="#fff" />
+                        ) : (
+                          <Icon name="circle-o" size={16} color="#9CA3AF" />
+                        )}
+                      </View>
+                      <Text style={[
+                        styles.optionLabel,
+                        (multiple ? selectedValues.includes(option.value) : selectedValue === option.value) && 
+                          styles.optionLabelSelected,
+                      ]}>
+                        {option.label}
+                      </Text>
+                    </View>
+                    {(multiple ? selectedValues.includes(option.value) : selectedValue === option.value) && (
+                      <Icon name="check" size={16} color={statColors.success} />
+                    )}
+                  </TouchableOpacity>
+                ))
+              )}
+            </ScrollView>
+
+            <View style={styles.modalFooter}>
+              {multiple && (
+                <TouchableOpacity
+                  style={styles.doneButton}
+                  onPress={() => setShowModal(false)}
+                >
+                  <LinearGradient
+                    colors={[statColors.accent, '#764ba2']}
+                    style={styles.doneButtonGradient}
+                  >
+                    <Text style={styles.doneButtonText}>
+                      Done ({selectedValues.length} selected)
+                    </Text>
+                  </LinearGradient>
+                </TouchableOpacity>
+              )}
+              <TouchableOpacity
+                style={styles.cancelButton}
+                onPress={() => setShowModal(false)}
+              >
+                <Text style={styles.cancelButtonText}>Cancel</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Selected items preview for multi-select */}
+      {multiple && selectedValues.length > 0 && (
+        <View style={styles.selectedPreview}>
+          <Text style={styles.selectedCount}>
+            {selectedValues.length} user{selectedValues.length !== 1 ? 's' : ''} selected
+          </Text>
+          <TouchableOpacity
+            onPress={() => onMultipleSelect([])}
+            style={styles.clearAllButton}
+          >
+            <Icon name="times-circle" size={16} color={statColors.danger} />
+            <Text style={styles.clearAllText}>Clear all</Text>
+          </TouchableOpacity>
+        </View>
+      )}
+    </View>
+  );
 };
 
 // ✅ Define getRoleName function
@@ -52,7 +278,8 @@ const AssignProjectsToUsers = ({ navigation }) => {
   const [selectedUserIds, setSelectedUserIds] = useState([]);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
-  const [searchText, setSearchText] = useState('');
+  const [showProjectDropdown, setShowProjectDropdown] = useState(false);
+  const [showUsersDropdown, setShowUsersDropdown] = useState(false);
 
   // Load initial data
   useEffect(() => {
@@ -79,7 +306,12 @@ const AssignProjectsToUsers = ({ navigation }) => {
     }
   };
 
-  // Format users for MultiSelect
+  // Format options for dropdowns
+  const projectOptions = projects.map(project => ({
+    label: project.name || `Project ${project.id}`,
+    value: project.id?.toString() || '',
+  }));
+
   const userOptions = users.map(user => {
     const roleName = getRoleName(user.role);
     const userName = user.name || 'No Name';
@@ -88,6 +320,7 @@ const AssignProjectsToUsers = ({ navigation }) => {
     return {
       label: `${userName} (${userEmail}) - ${roleName}`,
       value: user.id?.toString() || '',
+      original: user,
     };
   });
 
@@ -106,6 +339,11 @@ const AssignProjectsToUsers = ({ navigation }) => {
       console.log('No assigned users yet or error:', error);
       setSelectedUserIds([]);
     }
+  };
+
+  // Handle user selection for multi-select
+  const handleUserSelect = (userIds) => {
+    setSelectedUserIds(userIds);
   };
 
   // Submit assignment
@@ -230,28 +468,17 @@ const AssignProjectsToUsers = ({ navigation }) => {
             <Text style={styles.cardTitle}>1. Select Project</Text>
           </View>
           
-          <View style={styles.pickerContainer}>
-            <Picker
-              selectedValue={selectedProjectId}
-              onValueChange={onProjectChange}
-              style={styles.picker}
-              dropdownIconColor={statColors.total}
-            >
-              <Picker.Item label="— Choose a project —" value="" color="#6c757d" />
-              {projects.map(project => (
-                <Picker.Item
-                  key={project.id}
-                  label={project.name || `Project ${project.id}`}
-                  value={project.id.toString()}
-                  color="#212529"
-                />
-              ))}
-            </Picker>
-          </View>
+          <CustomDropdown
+            label="Project"
+            options={projectOptions}
+            selectedValue={selectedProjectId}
+            onSelect={onProjectChange}
+            placeholder="— Choose a project —"
+          />
           
           {selectedProjectId && (
             <View style={styles.selectedProjectContainer}>
-              <Icon name="check-circle" size={16} color={statColors.mobile} />
+              <Icon name="check-circle" size={16} color={statColors.success} />
               <Text style={styles.selectedProject}>
                 Selected: {projects.find(p => p.id.toString() === selectedProjectId)?.name}
               </Text>
@@ -270,23 +497,16 @@ const AssignProjectsToUsers = ({ navigation }) => {
             </Text>
           </View>
           
-          <MultiSelect
-            style={styles.dropdown}
-            placeholderStyle={styles.placeholderStyle}
-            selectedTextStyle={styles.selectedTextStyle}
-            inputSearchStyle={styles.inputSearchStyle}
-            iconStyle={styles.iconStyle}
-            search
-            data={userOptions}
-            labelField="label"
-            valueField="value"
+          <CustomDropdown
+            label="Users"
+            options={userOptions}
+            selectedValue={selectedUserIds[0]} // Not used for multi-select
+            onSelect={() => {}}
+            onMultipleSelect={handleUserSelect}
+            selectedValues={selectedUserIds}
             placeholder="Start typing to search users..."
-            searchPlaceholder="Search by name or email..."
-            value={selectedUserIds}
-            onChange={setSelectedUserIds}
-            onChangeText={setSearchText}
-            selectedStyle={styles.selectedStyle}
-            containerStyle={styles.dropdownContainer}
+            searchable={true}
+            multiple={true}
           />
           
           <Text style={styles.hint}>
@@ -310,7 +530,7 @@ const AssignProjectsToUsers = ({ navigation }) => {
           </View>
           <View style={styles.statDivider} />
           <View style={styles.statItem}>
-            <Icon name="check-circle" size={24} color={statColors.mobile} />
+            <Icon name="check-circle" size={24} color={statColors.success} />
             <Text style={styles.statNumber}>{selectedUserIds.length}</Text>
             <Text style={styles.statLabel}>Selected</Text>
           </View>
@@ -348,15 +568,15 @@ const AssignProjectsToUsers = ({ navigation }) => {
             <Text style={styles.infoTitle}>How to use</Text>
           </View>
           <View style={styles.infoItem}>
-            <Icon name="check-circle" size={14} color={statColors.mobile} style={styles.infoIcon} />
+            <Icon name="check-circle" size={14} color={statColors.success} style={styles.infoIcon} />
             <Text style={styles.infoText}>1. Select a project from the dropdown</Text>
           </View>
           <View style={styles.infoItem}>
-            <Icon name="check-circle" size={14} color={statColors.mobile} style={styles.infoIcon} />
+            <Icon name="check-circle" size={14} color={statColors.success} style={styles.infoIcon} />
             <Text style={styles.infoText}>2. Search and select users from the multi-select</Text>
           </View>
           <View style={styles.infoItem}>
-            <Icon name="check-circle" size={14} color={statColors.mobile} style={styles.infoIcon} />
+            <Icon name="check-circle" size={14} color={statColors.success} style={styles.infoIcon} />
             <Text style={styles.infoText}>3. Click "Assign Users" when ready</Text>
           </View>
         </View>
@@ -364,6 +584,9 @@ const AssignProjectsToUsers = ({ navigation }) => {
     </SafeAreaView>
   );
 };
+
+// Import TextInput for search
+import { TextInput } from 'react-native';
 
 const styles = StyleSheet.create({
   container: {
@@ -466,16 +689,39 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#212529',
   },
-  // Picker Styles
-  pickerContainer: {
-    borderWidth: 1,
-    borderColor: '#dee2e6',
-    borderRadius: 8,
-    backgroundColor: '#fff',
-    overflow: 'hidden',
+  // Dropdown Styles
+  dropdownContainer: {
+    marginBottom: 10,
   },
-  picker: {
-    height: 50,
+  dropdownLabel: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#374151',
+    marginBottom: 8,
+  },
+  dropdownTrigger: {
+    backgroundColor: '#F9FAFB',
+    borderRadius: 12,
+    padding: 16,
+    borderWidth: 2,
+    borderColor: '#E5E7EB',
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    minHeight: 50,
+  },
+  dropdownTriggerEmpty: {
+    borderColor: '#D1D5DB',
+  },
+  dropdownTriggerText: {
+    fontSize: 16,
+    color: '#2C3E50',
+    fontWeight: '500',
+    flex: 1,
+  },
+  dropdownTriggerPlaceholder: {
+    color: '#9CA3AF',
+    fontSize: 16,
   },
   selectedProjectContainer: {
     flexDirection: 'row',
@@ -483,55 +729,214 @@ const styles = StyleSheet.create({
     marginTop: 12,
     paddingVertical: 8,
     paddingHorizontal: 12,
-    backgroundColor: '#f8f9fa',
+    backgroundColor: '#f0f9ff',
     borderRadius: 6,
     alignSelf: 'flex-start',
   },
   selectedProject: {
     marginLeft: 8,
     fontSize: 14,
-    color: '#495057',
+    color: '#0c4a6e',
     fontWeight: '500',
   },
-  // Dropdown Styles
-  dropdown: {
-    height: 50,
-    backgroundColor: 'transparent',
-    borderWidth: 1,
-    borderColor: '#dee2e6',
-    borderRadius: 8,
-    paddingHorizontal: 15,
+  // Multiple Selection Styles
+  multipleSelectionContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    flex: 1,
+    alignItems: 'center',
+    gap: 6,
   },
-  dropdownContainer: {
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#dee2e6',
-    marginTop: 5,
+  selectedBadge: {
+    backgroundColor: '#e0f2fe',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 20,
+    maxWidth: 100,
   },
-  placeholderStyle: {
-    fontSize: 16,
-    color: '#6c757d',
-  },
-  selectedTextStyle: {
-    fontSize: 16,
-    color: '#212529',
+  selectedBadgeText: {
+    color: '#0369a1',
+    fontSize: 12,
     fontWeight: '500',
   },
-  iconStyle: {
+  moreBadge: {
+    backgroundColor: '#f1f5f9',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 20,
+  },
+  moreBadgeText: {
+    color: '#64748b',
+    fontSize: 12,
+    fontWeight: '500',
+  },
+  selectedPreview: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginTop: 10,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    backgroundColor: '#f8fafc',
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+  },
+  selectedCount: {
+    fontSize: 14,
+    color: '#475569',
+    fontWeight: '500',
+  },
+  clearAllButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  clearAllText: {
+    color: statColors.danger,
+    fontSize: 12,
+    fontWeight: '500',
+  },
+  // Modal Styles
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'flex-end',
+  },
+  modalContent: {
+    backgroundColor: '#fff',
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    maxHeight: '80%',
+    ...Platform.select({
+      ios: {
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: -3 },
+        shadowOpacity: 0.1,
+        shadowRadius: 10,
+      },
+      android: {
+        elevation: 20,
+      },
+    }),
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F3F4F6',
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: statColors.total,
+  },
+  modalCloseButton: {
+    padding: 4,
+  },
+  searchContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F3F4F6',
+  },
+  searchIcon: {
+    marginRight: 10,
+  },
+  searchInput: {
+    flex: 1,
+    fontSize: 16,
+    color: '#374151',
+    paddingVertical: 8,
+  },
+  optionsList: {
+    maxHeight: 400,
+  },
+  optionItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    padding: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F3F4F6',
+  },
+  optionItemSelected: {
+    backgroundColor: '#f0f9ff',
+    borderLeftWidth: 4,
+    borderLeftColor: statColors.accent,
+  },
+  lastOptionItem: {
+    borderBottomWidth: 0,
+  },
+  optionContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+  },
+  optionIcon: {
     width: 24,
     height: 24,
+    borderRadius: 12,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12,
   },
-  inputSearchStyle: {
-    height: 40,
+  optionIconSelected: {
+    backgroundColor: statColors.accent,
+  },
+  optionLabel: {
     fontSize: 16,
-    borderRadius: 6,
-    borderWidth: 0,
-    backgroundColor: '#f8f9fa',
+    color: '#374151',
+    flex: 1,
   },
-  selectedStyle: {
-    borderRadius: 20,
-    backgroundColor: '#e9ecef',
-    borderWidth: 0,
+  optionLabelSelected: {
+    color: statColors.total,
+    fontWeight: '600',
+  },
+  emptyState: {
+    padding: 40,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  emptyStateText: {
+    fontSize: 16,
+    color: '#6B7280',
+    marginTop: 12,
+    fontWeight: '500',
+  },
+  modalFooter: {
+    padding: 20,
+    borderTopWidth: 1,
+    borderTopColor: '#F3F4F6',
+    gap: 10,
+  },
+  doneButton: {
+    borderRadius: 12,
+    overflow: 'hidden',
+  },
+  doneButtonGradient: {
+    padding: 16,
+    alignItems: 'center',
+  },
+  doneButtonText: {
+    color: 'white',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  cancelButton: {
+    padding: 16,
+    alignItems: 'center',
+    borderRadius: 12,
+    backgroundColor: '#F3F4F6',
+  },
+  cancelButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#6B7280',
   },
   hint: {
     marginTop: 12,
